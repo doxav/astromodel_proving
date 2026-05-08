@@ -10,7 +10,7 @@ The target scientific reframing is:
 
 | ID | Reviewer objection | Required computational response |
 |---|---|---|
-| R1 | Degeneracy is not distinguished from structural non-identifiability, practical non-identifiability, sloppiness, or parameter compensation. | Operational definitions, effective parameters, FIM/profile-likelihood diagnostics, and mechanism mapping. |
+| R1 | Degeneracy is not distinguished from structural non-identifiability, practical non-identifiability, sloppiness, or parameter compensation. | Operational definitions, effective parameters, FIM/profile-likelihood diagnostics, compensation-vs-mode geometry, and mechanism mapping. |
 | R2 | Experimental variability, noise, uncertainty, and data constraints are insufficiently described. | Data provenance audit, ATF feature reliability, condition-specific thresholds, uncertainty-aware losses. |
 | R3 | Model assumptions are insufficiently justified: sigmoid gating, intracellular K as ECS proxy, and local/syncytial split. | Alternative model families, proxy validity quantification, compartment-split sensitivity. |
 | R4 | Vm-only fitting weakly constrains ionic dynamics and yields potentially non-physiological parameters. | Effective parameter reporting, parameter-range audits, constrained inference, hidden-current diagnostics. |
@@ -23,10 +23,12 @@ The target scientific reframing is:
 1. **Tests precede code.** Each step starts by adding unit, functional, and integration tests. New code is considered complete only when the step tests pass.
 2. **Each step has a validation notebook.** The notebook must load real data, generate at least one table and one visual diagnostic, and write machine-readable outputs under `outputs/<step>/`.
 3. **No Colab or Google Drive dependence.** Every notebook and test must run from the repository root with local paths.
-4. **No silent provenance assumptions.** Any ambiguous trace source, threshold source, or objective mismatch must be represented as an explicit status field.
+4. **No silent provenance assumptions.** Any ambiguous trace source, threshold source, objective mismatch, or candidate provenance mismatch must be represented as an explicit status field.
 5. **Mechanisms are not inferred from raw parameters alone.** Mechanistic claims require hidden-current or flux summaries.
 6. **Claims are graded as full or partial.** A step may partially answer a reviewer objection, but the notebook must state what remains unresolved.
 7. **Brain region is a first-class biological factor.** The 37 ATF files include dorsal hippocampus (`DH`) and ventral hippocampus (`VH`) cells. Region must be parsed, audited, retained in every table, used in thresholds/model evaluation, and shown in reviewer-facing summaries. Region-blind pooling is allowed only as an explicitly labeled sensitivity or shrinkage fallback, not as the primary analysis.
+8. **Legacy single-current DBs are provisional assets.** They are useful for provenance, debugging, structural confounding checks, and mechanism tooling. They are not sufficient for final claims about cell-level mechanisms, DH/VH enrichment, or biological degeneracy.
+9. **Cell-specific six-sweep ensembles are the primary reviewer-facing inference target.** Mechanism claims should be based on accepted parameter sets that jointly explain the six ordered sweeps of a cell and support held-out-current prediction or perturbation checks.
 
 ## Coverage audit against the current recommendation
 
@@ -34,17 +36,17 @@ This table is part of the specification. It records whether the development plan
 
 | Recommendation from analysis | Current coverage | Required refinement in this spec |
 |---|---|---|
-| Fit one cell across all 6 sweeps jointly, with one shared cell parameter set. | Partially covered: Step 06 currently describes condition/current-level multi-current validation and leaves full six-sweep/cell fitting as a backlog item. | Promote full cell-specific six-sweep fitting to the main Step 06 objective. Historical single-current DB transfer remains debug/triage only. |
-| Treat DH/VH brain region as a biological factor. | Partially covered: Step 02 already uses `condition × region × sweep`, and Step 06 reports by region, but region is not yet a formal design contract. | Add a region-aware experimental-design contract; audit DH/VH counts; preserve region in every output; stratify thresholds and predictive checks by region; use region-blind pooling only as a labeled sensitivity or shrinkage fallback. |
-| Reparameterize raw parameters into effective combinations before interpretation. | Well covered by Step 01 and Step 03. | Keep `P_gap_eff`, `gamma_t_eff`, `gamma_s_eff`, and `volume_ratio_wa_wo` as primary reporting coordinates. Add profile interpretation rules: clear valley, flat profile, boundary hit, broad valley. |
-| Merge structural and practical identifiability using a soft STRIKE-GOLDD-inspired workflow. | Partially covered: Step 03 separates FIM/profile and lists symbolic structural checks as optional. | Rename Step 03 as a combined structural-inspection + practical-profile workflow. Avoid claiming full STRIKE-GOLDD unless implemented. |
-| Use FIM/sloppiness diagnostics. | Covered by Step 03. | Keep FIM after effective-parameter reparameterization and run on representative accepted centers, not all trials. |
-| Analyze accepted-fit geometry as continuous compensation manifold vs separated modes. | Partially covered by Step 04. | Add bootstrap cluster stability and interpolation tests between candidate modes. Interpret continuous connected sets as compensation, not degeneracy. |
-| Mechanistic decomposition of accepted regimes. | Covered by Step 04. | Make clear that old DB-derived mechanisms are provisional until repeated with final six-sweep accepted ensembles. |
-| Assumption sensitivity for gating form. | Partially covered: sigmoid, tanh, Hill, and soft-threshold are included. | Add hard-threshold and double-sigmoid variants; compare all with identical data splits, loss definitions, and evaluation metrics. |
-| Proxy and compartment-split sensitivity. | Covered by Step 05. | Keep explicit ECS variant optional unless proxy validity fails; keep one-state intracellular variant as sensitivity. |
-| Parameter plausibility and constrained reruns. | Covered by Step 07. | Distinguish `within_range`, `identifiable`, and `physiologically_interpretable`; a parameter inside bounds may still be weakly identified. |
-| Population-level posterior predictive checks. | Partially covered by Step 06 and Step 09. | Add explicit feature-distribution posterior predictive checks for `region × condition × sweep` groups using accepted ensembles. |
+| Fit one cell across all 6 sweeps jointly, with one shared cell parameter set. | Promoted to the main Step 04 objective. | Historical single-current DB transfer remains debug/triage only. Reviewer-facing accepted ensembles are cell-specific and six-sweep aware. |
+| Treat DH/VH brain region as a biological factor. | Covered by Step 02 and carried into Steps 04, 05, 06, and 09. | Preserve region in every cell-level output; stratify thresholds and predictive checks by region; use region-blind pooling only as a labeled sensitivity or shrinkage fallback. |
+| Reparameterize raw parameters into effective combinations before interpretation. | Covered by Step 01 and Step 03. | Keep `P_gap_eff`, `gamma_t_eff`, `gamma_s_eff`, and `volume_ratio_wa_wo` as primary reporting coordinates. Add profile interpretation rules: clear valley, flat profile, boundary hit, broad valley. |
+| Merge structural and practical identifiability using a soft STRIKE-GOLDD-inspired workflow. | Covered by Step 03 as a structural-inspection + practical-profile workflow. | Avoid claiming full STRIKE-GOLDD unless a formal symbolic tool is implemented. |
+| Use FIM/sloppiness diagnostics. | Covered by Step 03. | Keep FIM after effective-parameter reparameterization and run on verified representative centers before Step 04; rerun or extend on accepted cell-specific centers once Step 04 exists. |
+| Analyze accepted-fit geometry as continuous compensation manifold vs separated modes. | Covered by Step 05 after cell-specific accepted ensembles exist. | Add bootstrap cluster stability and interpolation tests between candidate modes. Interpret continuous connected sets as compensation, not degeneracy. |
+| Mechanistic decomposition of accepted regimes. | Covered by Step 05. | Use Step 04 cell-specific accepted ensembles for primary claims. Legacy DB-derived mechanisms remain provisional tooling/debug output. |
+| Assumption sensitivity for gating form. | Covered by Step 07. | Include sigmoid, tanh, Hill, soft-threshold, hard-threshold, and double-sigmoid variants; compare all with identical data splits, loss definitions, and evaluation metrics. |
+| Proxy and compartment-split sensitivity. | Covered by Step 07. | Keep explicit ECS variant optional unless proxy validity fails; keep one-state intracellular variant as sensitivity. |
+| Parameter plausibility and constrained reruns. | Covered by Step 08. | Distinguish `within_range`, `identifiable`, and `physiologically_interpretable`; a parameter inside bounds may still be weakly identified. |
+| Population-level posterior predictive checks. | Covered by Step 06 and Step 09. | Add explicit feature-distribution posterior predictive checks for `region × condition × sweep` groups using accepted ensembles. |
 | Figures and reviewer-facing outputs. | Covered by Step 09. | Add a traceability table mapping each figure/table to reviewer critique IDs and source outputs. |
 
 ## Region-aware experimental-design contract
@@ -406,7 +408,7 @@ This step should be presented as a **structural-identifiability-informed practic
 - Demonstrate exact or near-exact structural confoundings where possible, starting with `P_gap_eff = d × pk`.
 - Profile selected raw/effective parameters by fixing one value, refitting nuisance parameters, and reporting the best achievable loss.
 - Interpret profiles as `clear_valley`, `broad_valley`, `flat_unbounded`, or `boundary_hit`.
-- Compute finite-difference Jacobian and FIM around representative accepted centers.
+- Compute finite-difference Jacobian and FIM around verified representative centers before Step 04, then allow later reuse on Step 04 accepted cell-specific centers.
 - Report eigenvalue spectra on log scale and map stiff/sloppy modes to raw/effective parameters.
 
 ### Approaches to compare
@@ -416,7 +418,7 @@ This step should be presented as a **structural-identifiability-informed practic
 | Equation-level structural inspection | Required | Use to define effective parameters before fitting interpretation. |
 | Exact invariance demonstrations | Required where possible | Start with `d × pk`; add other product/ratio demonstrations if valid. |
 | Profile likelihood | Main practical identifiability evidence | Use for representative conditions and key effective parameters. |
-| FIM finite differences | Sloppiness diagnostic | Use after reparameterization, around representative accepted centers. |
+| FIM finite differences | Sloppiness diagnostic | Use after reparameterization, around verified representative centers; later repeat on Step 04 accepted cell-specific centers when available. |
 | Full STRIKE-GOLDD or symbolic tool | Optional backlog | Only claim it if implemented and documented. |
 
 ### How to verify
@@ -446,7 +448,7 @@ Feature: equation-level structural inspection defines effective parameters
 @step03 @R1 @profile-likelihood
 Feature: practical identifiability by profile likelihood
   Scenario: a parameter profile is classified by shape
-    Given an accepted representative fit
+    Given a verified representative fit center
     When one effective parameter is profiled and nuisance parameters are refit
     Then the profile curve is saved
     And the profile is classified as clear_valley, broad_valley, flat_unbounded, or boundary_hit
@@ -457,7 +459,7 @@ Feature: practical identifiability by profile likelihood
 @step03 @R1 @sloppiness @FIM
 Feature: FIM sloppiness spectrum
   Scenario: Vm/features expose stiff and sloppy parameter combinations
-    Given a verified representative accepted center
+    Given a verified representative fit center
     When the finite-difference Jacobian of Vm/features is computed
     Then the FIM eigen-spectrum is saved
     And each mode is annotated by dominant raw and effective parameters
@@ -477,65 +479,215 @@ The notebook must show:
 - stiff/sloppy mode loading table;
 - short reviewer-facing interpretation text.
 
+---
 
-## Step 04 — Accepted ensembles and mechanistic decomposition
+## Transition from identifiability diagnostics to reviewer-facing ensembles
 
-**Pareto rank:** 4. Converts non-identifiable fits into provisional mechanism-level evidence. Historical single-current DB ensembles are useful for triage and figure/method development; final reviewer-facing mechanism claims should be repeated on the six-sweep cell-specific accepted ensembles from Step 06.
+Step 03 uses verified representative fit centers to diagnose raw/effective identifiability limits. These centers are not the final reviewer-facing accepted ensembles. The reviewer-facing accepted ensembles are constructed in Step 04 by fitting each cell across its six sweeps with shared cell-level parameters and explicit held-out-current checks.
 
-**Primary output:** `outputs/mechanisms/accepted_fit_mechanisms.csv`, `outputs/mechanisms/mechanism_clusters.csv`, `outputs/mechanisms/representatives.csv`, `outputs/mechanisms/region_mechanism_enrichment.csv`.
+Consequences:
+
+1. Step 03 can support statements about structural non-separability, practical non-identifiability, and sloppiness.
+2. Step 03 cannot, by itself, support biological degeneracy or DH/VH mechanism-enrichment claims.
+3. Step 04 is the first step that creates the accepted cell-specific inference target for downstream mechanism decomposition.
+4. Step 05 is the first step that can evaluate candidate mechanism regimes from accepted cell-specific ensembles.
+5. Step 06 is required before any mechanism regime is described as robust under prediction or perturbation.
+
+
+## Step 04 — Cell-specific six-sweep fitting and accepted ensemble construction
+
+**Pareto rank:** 4. Builds the reviewer-facing accepted ensembles that make downstream mechanistic decomposition meaningful. This step fits each cell across its six ordered sweeps with one shared cell-level parameter set and current-specific known inputs or nuisance terms.
+
+**Primary output:** `outputs/cell_fits/cell_fit_candidates.csv`, `outputs/cell_fits/accepted_cell_ensembles.csv`, `outputs/cell_fits/cell_fit_quality_summary.csv`, `outputs/cell_fits/heldout_current_screen.csv`, `outputs/cell_fits/acceptance_contract.csv`.
+
+### Scientific objectives
+
+1. **Resolve R2 strongly:** use empirical region-aware thresholds and feature reliability weights when defining accepted fits.
+2. **Resolve R4 strongly:** reduce Vm-only overfitting by requiring one shared mechanism to explain six sweeps of a cell.
+3. **Resolve R6 partially:** establish held-out-current prediction as part of the accepted-ensemble contract.
+4. **Prepare R5:** create cell-level accepted ensembles suitable for mechanism decomposition in Step 05.
+5. **Protect R1:** prevent single-current non-identifiability from being mistaken for cell-level degeneracy.
+
+This step should be the main source of reviewer-facing accepted ensembles. Historical single-current DBs remain useful for initialization, parameter-range priors, debugging, and method comparison, but not for final mechanism claims.
+
+### Technical objectives
+
+- Fit each ATF file/cell jointly across its six sweeps.
+- Use one shared cell-level parameter vector per candidate fit.
+- Treat current level, stimulus amplitude, or bath-driving terms as known protocol inputs or clearly labeled nuisance terms.
+- Use effective parameters as primary optimization/reporting coordinates where possible: `P_gap_eff`, `gamma_t_eff`, `gamma_s_eff`, `volume_ratio_wa_wo`.
+- Use Step 02 reliability-weighted feature thresholds in the acceptance contract.
+- Use a composite loss with:
+  - baseline-subtracted Vm trace loss;
+  - reliability-weighted feature loss;
+  - binary penalties for plateau/undershoot presence when appropriate;
+  - weak priors or penalties for physiological plausibility;
+  - explicit failure penalties for non-finite simulations.
+- Implement at least two validation modes:
+  - fit all six sweeps and report fit quality;
+  - fit five sweeps and predict the held-out sixth sweep, rotated across all six sweeps.
+- Preserve `file_id`, `region`, `condition`, `sweep`, `candidate_id`, `fit_scope`, `heldout_sweep`, and `provenance_status` in all outputs.
+- Record whether a candidate is accepted by trace error, feature contract, held-out prediction, and simulation health.
+- Allow historical DB best/top candidates only as optional initialization seeds with `seed_source = legacy_db`, not as accepted final candidates. Only Step 00 `verified` DBs may be used as initialization seeds for reviewer-facing runs; `unresolved` or `missing_source` DBs are debug-only.
+
+### Approaches to compare
+
+| Approach | Use | Selection rule |
+|---|---|---|
+| Cell-specific six-sweep joint fit | Primary | Required reviewer-facing accepted ensemble source. |
+| Five-sweep fit with held-out prediction | Primary validation | Required before downstream robust mechanism claims. |
+| Historical DB initialization | Optional speed/debug | Allowed only from Step 00 `verified` DBs as initialization; must not determine acceptance by itself. Unresolved sources are debug-only. |
+| Region-specific acceptance thresholds | Primary | Use when stratum is sufficient. |
+| Region-pooled thresholds | Sensitivity/shrinkage fallback | Use only when small strata make region-specific thresholds unstable. |
+| Global thresholds | Negative-control sensitivity | Never use as the primary reviewer-facing acceptance rule. |
+
+### How to verify
+
+- `accepted_cell_ensembles.csv` contains `file_id`, `region`, `condition`, `candidate_id`, and shared cell-level parameters.
+- Each accepted candidate links to six sweep-level simulations or a documented held-out prediction split.
+- Every cell reports the number of accepted candidates and failure counts.
+- Acceptance is based on both trace quality and Step 02 reliability-weighted feature contracts.
+- Held-out prediction errors are reported by `region × condition × sweep`.
+- Historical DB seeds, when used, are labeled as seeds only.
+
+### Gherkin specifications
+
+```gherkin
+@step04 @R2 @R4 @cell-six-sweep-fit
+Feature: one shared cell mechanism fits six ordered sweeps
+  Scenario: a cell-level candidate explains all six sweeps
+    Given one ATF cell with six sweeps
+    And region-aware feature thresholds from Step 02
+    When the six-sweep fitting pipeline optimizes a shared parameter vector
+    Then the output contains one candidate_id linked to six sweep simulations
+    And the candidate preserves file_id, region, condition, and sweep
+    And the acceptance decision uses reliability-weighted trace and feature criteria
+```
+
+```gherkin
+@step04 @R6 @heldout-current
+Feature: held-out current prediction is part of accepted ensemble construction
+  Scenario: five sweeps are fit and the sixth sweep is predicted
+    Given one ATF cell with six ordered sweeps
+    When the pipeline fits five sweeps and predicts the held-out sweep
+    Then the held-out sweep error is reported
+    And the held-out feature-pass fraction is reported
+    And the candidate is not marked reviewer-facing if held-out prediction fails the configured tolerance
+```
+
+```gherkin
+@step04 @R4 @legacy-seeds
+Feature: historical single-current DBs can seed but not define final accepted ensembles
+  Scenario: legacy candidates are used as initialization
+    Given verified historical DB parameters
+    When they are used to initialize a cell-specific six-sweep fit
+    Then the output records seed_source = legacy_db
+    And final acceptance depends only on cell-specific six-sweep fit and validation criteria
+    And unresolved historical DBs cannot produce reviewer-facing accepted candidates
+```
+
+```gherkin
+@step04 @R2 @region-contract
+Feature: accepted cell ensembles retain region identity
+  Scenario: accepted candidates are summarized by region and condition
+    Given cell-level accepted candidates
+    When acceptance summaries are written
+    Then every row includes region and condition
+    And DH/VH summaries are reported separately
+    And small strata are flagged rather than silently pooled
+```
+
+### Notebook required
+
+`analysis/04_cell_specific_six_sweep_fitting.ipynb`
+
+The notebook must show:
+
+- cell-level fit inventory by `region × condition`;
+- accepted candidate counts per cell;
+- example six-sweep fit overlays for at least one DH and one VH cell per condition when available;
+- held-out-current prediction summaries;
+- acceptance contract table;
+- failure/provenance table.
+
+### Tests required before implementation
+
+- Unit: cell protocol builder; effective-parameter conversion; feature-contract scoring; held-out split generator.
+- Functional: one cell can be fit or scored across all six sweeps.
+- Integration: a small subset of cells produces `accepted_cell_ensembles.csv` and held-out summaries.
+
+---
+
+## Step 05 — Mechanistic decomposition of accepted cell ensembles
+
+**Pareto rank:** 5. Converts cell-specific accepted ensembles into mechanism-level evidence. This is the primary step for R5 and the first step where candidate mechanism regimes may be assessed. These regimes remain candidate regimes until Step 06 predictive and perturbation checks support them.
+
+**Primary output:** `outputs/mechanisms/accepted_fit_mechanisms.csv`, `outputs/mechanisms/mechanism_clusters.csv`, `outputs/mechanisms/representatives.csv`, `outputs/mechanisms/region_mechanism_enrichment.csv`, `outputs/mechanisms/geometry_classification.csv`.
 
 ### Scientific objectives
 
 1. **Resolve R5 strongly:** show whether accepted parameter regimes correspond to distinct Kir/gap/leak buffering balances.
-2. **Resolve R1 partially:** distinguish continua from separated modes in mechanism space.
-3. **Resolve R4 partially:** interpret accepted fits through fluxes rather than raw parameters.
-4. **Resolve R2/R5 partially:** test whether candidate mechanism regimes are enriched differently in DH and VH without claiming paired or animal-level effects.
+2. **Resolve R1 partially:** distinguish continuous compensation manifolds from separated mechanism modes.
+3. **Resolve R4 partially:** interpret accepted fits through fluxes, effective parameters, and hidden states rather than raw parameter values.
+4. **Resolve R2/R5 partially:** summarize candidate mechanism regimes by DH/VH and condition as population-level cell effects.
+5. **Prepare R6:** select representative mechanism-diverse candidates for perturbation and predictive checks.
 
 ### Technical objectives
 
-- Apply condition-specific thresholds from Step 02 to top-N or all complete trials.
-- Simulate accepted fits with hidden outputs.
-- Compute flux summaries: Kir integral, gap integral, leak integral, K_o peak/final/recovery, proxy validity.
+- Load `outputs/cell_fits/accepted_cell_ensembles.csv` from Step 04.
+- Simulate accepted cell-level candidates with hidden outputs for all six sweeps.
+- Compute flux summaries:
+  - Kir integral and peak;
+  - gap-junction integral and peak;
+  - leak integral and peak;
+  - K_o peak, final, recovery error;
+  - gap/Kir ratio;
+  - proxy validity metrics for `ΔK_a,t` versus `K_o`.
 - Cluster in effective/mechanism space, not raw parameter space alone.
-- Estimate whether the accepted set forms a continuous compensation manifold or separated modes.
-- Test cluster stability by bootstrap resampling.
+- Use `P_gap_eff = d × pk`, `gamma_t_eff`, `gamma_s_eff`, and `volume_ratio_wa_wo` as primary geometry coordinates.
+- Estimate whether accepted sets form continuous compensation manifolds or separated modes.
+- Test cluster stability by bootstrap resampling at the cell level.
 - Test interpolations between candidate modes in log/effective-parameter space.
 - Select representative fits that preserve function while maximizing mechanism diversity.
-- Report mechanism-cluster occupancy and enrichment by `region × condition`, with cell-level counts.
+- Report cluster occupancy and enrichment by `region × condition`, with cell-level counts and small-stratum flags.
+- Keep all failed simulations and proxy failures as explicit statuses.
 
 ### Approaches to compare
 
 | Approach | Use | Selection rule |
 |---|---|---|
 | Best-trial only | Debug only | Not reviewer-facing. |
-| Top-N accepted ensemble | Main post-fit analysis | Use once thresholds are condition-specific. |
+| Cell-specific accepted ensemble | Main analysis | Required for reviewer-facing mechanism claims. |
 | Mechanism-space clustering | Main clustering | Prefer over raw-parameter UMAP for claims. |
-| Bootstrap cluster stability | Required for mode claims | A cluster is reviewer-facing only if it is stable under resampling. |
-| Interpolation between candidate modes | Required for separated-mode claims | If interpolated points also fit, call the structure compensation rather than separated degeneracy. |
+| Bootstrap cluster stability | Required for separated-mode claims | A cluster is reviewer-facing only if it is stable under cell-level resampling. |
+| Interpolation between candidate modes | Required for separated-mode claims | If interpolated points remain accepted, call the structure compensation rather than separated degeneracy. |
 | Representative maximin selection | Figure construction | Choose same-function but mechanism-diverse examples. |
+| Region enrichment | Population-level summary | Report as cell-level region/condition association, not paired pharmacology or animal-level phenotype. |
 
 ### How to verify
 
-- Accepted ensemble size is reported per condition/current.
-- Each accepted fit has flux and proxy metrics.
+- Accepted ensemble size is reported per `region × condition × cell`.
+- Each accepted fit has flux and proxy metrics for each sweep.
 - Clusters differ in mechanism metrics while preserving functional metrics.
 - Cluster summaries include region and condition occupancy, and no cluster claim is based on pooled regions alone.
-- Continuous accepted sets are labeled `compensation_manifold`; only stable separated sets with distinct flux decompositions are labeled `candidate_degenerate_regimes`.
+- Continuous accepted sets are labeled `compensation_manifold`.
+- Only stable separated sets with distinct flux decompositions are labeled `candidate_mechanism_regimes_pending_validation` before Step 06. The stronger label `candidate_degenerate_regimes` is allowed only after Step 06 predictive or perturbation checks support functional robustness.
+- Candidate degeneracy labels include a status field indicating whether predictive validation and perturbation support are still pending.
 
 ### Gherkin specifications
 
 ```gherkin
-@step04 @R5 @accepted-ensemble
-Feature: accepted fits are translated into mechanism summaries
-  Scenario: every accepted fit has hidden-current metrics
-    Given accepted top-N fits for a condition/current
+@step05 @R5 @accepted-ensemble
+Feature: accepted cell fits are translated into mechanism summaries
+  Scenario: every accepted cell candidate has hidden-current metrics
+    Given Step 04 accepted cell-specific six-sweep candidates
     When the mechanism pipeline simulates them
     Then each fit has I_Kir, I_kgap, I_leak, K_o, gap/Kir ratio, and proxy validity
     And failed simulations are reported without corrupting the ensemble
 ```
 
 ```gherkin
-@step04 @R1 @R5 @mechanism-diversity
+@step05 @R1 @R5 @mechanism-diversity
 Feature: same-function but different-mechanism representatives
   Scenario: representatives preserve function while maximizing mechanism distance
     Given an accepted ensemble with functional and mechanism columns
@@ -544,9 +696,8 @@ Feature: same-function but different-mechanism representatives
     And their mechanism distances exceed the configured diversity threshold
 ```
 
-
 ```gherkin
-@step04 @R1 @geometry
+@step05 @R1 @geometry
 Feature: accepted-fit geometry separates compensation from modes
   Scenario: interpolated parameters test whether two clusters are disconnected
     Given two candidate accepted clusters in effective-parameter space
@@ -554,10 +705,11 @@ Feature: accepted-fit geometry separates compensation from modes
     Then each interpolated point is simulated and scored
     And the pair is classified as compensation_manifold when interpolations remain accepted
     And the pair is classified as separated_modes only when interpolations pass through poor-fit regions
+    And separated modes remain pending_validation until Step 06 robustness checks are passed
 ```
 
 ```gherkin
-@step04 @R2 @R5 @region-mechanisms
+@step05 @R2 @R5 @region-mechanisms
 Feature: mechanism regimes are summarized by brain region
   Scenario: mechanism-cluster occupancy is reported separately for DH and VH
     Given accepted cell-level ensembles with mechanism-cluster labels
@@ -569,13 +721,108 @@ Feature: mechanism regimes are summarized by brain region
 
 ### Notebook required
 
-`analysis/04_mechanistic_decomposition.ipynb`
+`analysis/05_mechanistic_decomposition.ipynb`
+
+The notebook must show:
+
+- accepted cell ensemble inventory;
+- flux decomposition figures for representative candidates;
+- mechanism-space clustering plots;
+- compensation-vs-separated-mode interpolation diagnostics;
+- bootstrap stability table;
+- DH/VH and condition occupancy table;
+- explicit claim-scope table.
 
 ---
 
-## Step 05 — Assumption sensitivity: gating, proxy, and compartment split
+## Step 06 — Predictive validation, posterior predictive checks, and perturbation robustness
 
-**Pareto rank:** 5. Addresses model-assumption criticism after the main inference pipeline is stable.
+**Pareto rank:** 6. Tests whether accepted ensembles predict beyond fitted traces and remain functionally robust under perturbations.
+
+**Primary output:** `outputs/predictive_validation/heldout_current_errors.csv`, `outputs/predictive_validation/prediction_intervals.csv`, `outputs/predictive_validation/feature_distribution_ppc.csv`, `outputs/predictive_validation/perturbation_sweeps.csv`, `outputs/predictive_validation/robustness_summary.csv`.
+
+### Scientific objectives
+
+1. **Resolve R6 strongly:** test robustness beyond fitted sweeps.
+2. **Resolve R1/R5 partially:** separate parameter compensation that only fits training traces from mechanism regimes that preserve function under prediction and perturbation.
+3. **Resolve R2 partially:** compare simulated predictive distributions to empirical feature distributions by `region × condition × sweep`.
+4. **Resolve R7 partially:** create clear predictive validation figures.
+
+### Technical objectives
+
+- Load accepted cell ensembles from Step 04 and mechanism labels from Step 05.
+- Aggregate held-out-current results from Step 04.
+- Produce prediction intervals from accepted ensembles.
+- Compare feature distributions from simulations with empirical Step 02 distributions.
+- Run perturbation sweeps for:
+  - bath coupling `epsilon`;
+  - stimulus duration;
+  - baseline `K_o`;
+  - current amplitude scaling;
+  - plausible physiologic nuisance terms if implemented.
+- Summarize robustness by mechanism cluster, region, condition, and sweep.
+- Label mechanisms as `predictive_supported`, `prediction_limited`, or `fit_only`.
+
+### Approaches to compare
+
+| Approach | Use | Selection rule |
+|---|---|---|
+| Leave-one-current-out within cell | Primary | Required for reviewer-facing robustness. |
+| Low-to-high prediction | Stress test | Fit lower currents and predict high-current sweeps. |
+| High-to-low prediction | Stress test | Fit high currents and predict lower-current sweeps. |
+| Posterior predictive feature checks | Primary | Compare accepted-ensemble feature distributions to Step 02 empirical bands. |
+| Perturbation sweeps | Primary | Test whether candidate mechanisms preserve K buffering under altered inputs. |
+
+### How to verify
+
+- Held-out prediction errors are written for all attempted cells and sweeps.
+- Prediction intervals are finite and traceable to accepted candidates.
+- Feature PPC tables include `region`, `condition`, `sweep`, and `feature`.
+- Perturbation outputs include mechanism labels and robustness classifications.
+- Any mechanism cluster that fails prediction or perturbation is not labeled as reviewer-facing biological degeneracy.
+
+### Gherkin specifications
+
+```gherkin
+@step06 @R6 @heldout-current
+Feature: accepted ensembles predict held-out currents
+  Scenario: a held-out sweep is predicted from the remaining sweeps
+    Given accepted cell-specific candidates from Step 04
+    When a held-out current is predicted
+    Then trace error and feature-pass metrics are reported
+    And results are summarized by region, condition, and sweep
+```
+
+```gherkin
+@step06 @R2 @posterior-predictive
+Feature: simulated feature distributions are compared with empirical distributions
+  Scenario: accepted ensemble predictions match empirical feature bands
+    Given empirical Step 02 feature thresholds
+    And accepted ensemble simulations
+    When posterior predictive feature checks are computed
+    Then the output reports coverage by region, condition, sweep, and feature
+    And redundant or low-reliability features are weighted accordingly
+```
+
+```gherkin
+@step06 @R6 @perturbation
+Feature: mechanism regimes are stress-tested by perturbation
+  Scenario: accepted mechanism clusters are simulated under altered inputs
+    Given mechanism-labeled accepted ensembles
+    When bath coupling, stimulus duration, baseline K_o, or current amplitude are perturbed
+    Then functional buffering metrics are reported
+    And clusters are classified by robustness
+```
+
+### Notebook required
+
+`analysis/06_predictive_validation_and_perturbation.ipynb`
+
+---
+
+## Step 07 — Assumption sensitivity: gating, proxy, and compartment split
+
+**Pareto rank:** 7. Addresses model-assumption criticism after the main inference pipeline is stable.
 
 **Primary output:** `outputs/assumption_sensitivity/model_comparison.csv`, `outputs/assumption_sensitivity/gating_family_comparison.csv`, `outputs/assumption_sensitivity/proxy_validity_by_ensemble.csv`, `outputs/assumption_sensitivity/compartment_split_sensitivity.csv`.
 
@@ -583,398 +830,235 @@ Feature: mechanism regimes are summarized by brain region
 
 1. **Resolve R3 strongly:** show whether conclusions are brittle to gating form, proxy choice, or local/syncytial split.
 2. **Resolve R6 partially:** quantify where model predictions diverge under assumption changes.
+3. **Resolve R1/R5 partially:** test whether candidate mechanism regimes are stable across plausible model formulations.
 
 ### Technical objectives
 
-- Implement separate model-family fits: sigmoid, Hill, soft-threshold/tanh, hard-threshold, and double-sigmoid.
-- Keep model-family comparison outside the Optuna parameter search; do not mix `switching_function` as a categorical parameter inside one primary inference run.
-- Compare fit quality, accepted ensemble size, CV error, prediction bands, and mechanism clusters by region and condition.
-- Quantify `corr(ΔK_a,t, K_o)` and lag across accepted ensembles.
-- Implement a one-intracellular-state sensitivity model or reduced split variant.
+- Implement separate model-family fits or scored variants using identical data splits and acceptance contracts:
+  - sigmoid;
+  - tanh;
+  - Hill;
+  - soft-threshold linear;
+  - hard-threshold;
+  - double-sigmoid, if identifiable enough.
+- Quantify proxy validity between `ΔK_a,t` and `K_o` for accepted ensembles.
+- If proxy validity fails systematically, implement or score a minimal explicit ECS variant.
+- Compare two-state local/syncytial intracellular K model against a one-state intracellular variant.
+- Report whether accepted mechanisms and robustness classifications persist.
 
 ### Approaches to compare
 
 | Approach | Use | Selection rule |
 |---|---|---|
-| Sigmoid gating | Baseline manuscript form | Retain only if predictive and mechanism conclusions are not uniquely dependent on it. |
-| Hill gating | Smooth saturating alternative | Compare with equal data splits and loss definitions. |
-| Soft-threshold/tanh gating | Smooth threshold alternative | Compare with equal data splits and loss definitions. |
-| Hard-threshold gating | Stress test | Use to determine whether conclusions depend on smooth gating. |
-| Double-sigmoid gating | Flexible two-transition alternative | Use to test whether one threshold is too restrictive. |
-| Same parameter count or penalized-complexity comparison | Primary | Prefer CV/predictive performance over in-sample loss alone. |
-| Proxy validity metrics | Required | Report failures, not only successes. |
-| Minimal ECS extension | Optional | Use if proxy validity frequently fails. |
-| Single-state intracellular model | Sensitivity | Use to check whether split creates artificial degeneracy. |
+| Same split/same loss model-family comparison | Primary | Required for gating sensitivity. |
+| Proxy correlation and lag metrics | Primary | Required for intracellular-K-as-ECS-proxy criticism. |
+| Minimal explicit ECS variant | Conditional | Required if proxy validity fails in reviewer-facing regimes. |
+| One-state intracellular variant | Sensitivity | Required to test local/syncytial split dependence. |
 
 ### How to verify
 
-- Model-family comparison uses identical data splits, region labels, and loss definitions.
-- Gating variants are implemented as separate model-family runs and recorded in the comparison table.
-- Proxy validity is quantified per accepted fit and summarized by condition/current/cluster.
-- Any qualitative degeneracy claim is reported as robust or not robust across variants.
+- Every compared model family uses identical splits, thresholds, and reporting metrics.
+- Model comparison tables include fit quality, held-out prediction, feature PPC, and robustness metrics.
+- Proxy validity is reported by region, condition, sweep, and mechanism cluster.
+- Assumption sensitivity text explicitly states which claims are robust and which are model-dependent.
 
 ### Gherkin specifications
 
 ```gherkin
-@step05 @R3 @gating-comparison
-Feature: alternative gating functions are compared fairly
-  Scenario: sigmoid, Hill, soft-threshold/tanh, hard-threshold, and double-sigmoid variants use the same protocol
-    Given identical data splits, seeds, priors, and loss definitions
-    When each gating family is fit and evaluated
-    Then the comparison table reports in-sample loss, CV error, accepted ensemble size, prediction-band width, and mechanism persistence
-    And no primary conclusion is based only on the best in-sample loss
+@step07 @R3 @gating-sensitivity
+Feature: gating-family conclusions are compared under identical contracts
+  Scenario: different gating forms are evaluated fairly
+    Given accepted-fit contracts and data splits
+    When each gating family is fit or scored
+    Then the output reports fit, prediction, and mechanism metrics with identical definitions
+    And mechanism claims are marked robust only if they persist across configured families
 ```
 
 ```gherkin
-@step05 @R3 @gating-implementation
-Feature: gating variants are separate model-family runs
-  Scenario: switching_function is not mixed as a categorical search parameter in the main inference
-    Given the assumption-sensitivity configuration
-    When the gating-family jobs are created
-    Then sigmoid, Hill, soft-threshold/tanh, hard-threshold, and double-sigmoid are separate runs
-    And each run writes its model_family identifier to the output table
+@step07 @R3 @proxy-validity
+Feature: intracellular K proxy validity is quantified
+  Scenario: ΔK_a,t is compared with K_o
+    Given accepted ensemble simulations with hidden states
+    When proxy validity metrics are computed
+    Then Pearson/Spearman correlation, RMSE after scaling, and lag are reported
+    And failed proxy regimes are not described as reliable ECS K readouts
 ```
 
 ```gherkin
-@step05 @R3 @proxy-validity
-Feature: intracellular K proxy validity is quantified rather than assumed
-  Scenario: proxy validity can succeed or fail by condition and mechanism
-    Given accepted simulations with K_o and ΔK_a,t outputs
-    When proxy validity is computed
-    Then Pearson/Spearman correlation, lag, scaled RMSE, and validity class are reported
-    And the manuscript does not claim universal proxy validity when failures are present
+@step07 @R3 @compartment-split
+Feature: local/syncytial split sensitivity is tested
+  Scenario: one-state and two-state intracellular formulations are compared
+    Given the same empirical data and acceptance contract
+    When the split and non-split variants are evaluated
+    Then the output reports whether accepted mechanism structure persists
 ```
 
 ### Notebook required
 
-`analysis/05_assumption_sensitivity.ipynb`
-
-
-## Step 06 — Cell-specific six-sweep fitting and predictive validation
-
-**Pareto rank:** 6. The strongest response to robustness criticism and the main replacement for the old single-current fitting logic.
-
-**Primary output:** `outputs/cross_validation/cell_six_sweep_fit_summary.csv`, `outputs/cross_validation/leave_one_sweep_out.csv`, `outputs/cross_validation/prediction_bands.csv`, `outputs/cross_validation/posterior_predictive_feature_checks.csv`.
-
-### Scientific objectives
-
-1. **Resolve R6 strongly:** show whether accepted parameter regimes predict held-out sweeps/currents.
-2. **Resolve R2 strongly:** use the 37 independent ATF cells as the fitting/evaluation unit rather than treating conditions or regions as single representative traces.
-3. **Resolve R1 partially:** identify whether candidate mechanism modes remain functionally equivalent outside fitted traces.
-4. **Resolve R5 partially:** test whether distinct mechanisms diverge under held-out conditions.
-
-### Technical objectives
-
-- Build a cell-specific six-sweep objective with one shared biological/effective parameter set per cell.
-- Carry each cell's `region` label through fitting, validation, posterior predictive checks, and accepted-ensemble summaries.
-- Use a monotone ordered stimulus mapping across the six sweeps.
-- Use a composite loss with trace, feature, binary-feature, prior, and failure-penalty terms.
-- Fit all six sweeps jointly for each ATF cell, then produce an accepted-fit ensemble per cell.
-- Fit 5 sweeps and predict the held-out sweep; rotate all six sweeps.
-- Fit low sweeps and predict high sweeps; fit high sweeps and predict low sweeps.
-- Produce prediction intervals from accepted ensembles.
-- Perform population-level posterior predictive checks by comparing simulated feature distributions against empirical `region × condition × sweep` distributions.
-- Report primary held-out errors separately for DH and VH before pooled summaries.
-- Use region-specific thresholds from Step 02; use region-pooled thresholds only as explicitly labeled sensitivity/fallback.
-
-### Approaches to compare
-
-| Approach | Use | Selection rule |
-|---|---|---|
-| Full six-sweep/cell fit using ATF cells | Main reviewer-facing inference | Required for final claims; must retain DH/VH labels. |
-| Leave-one-sweep-out | Main validation | Required for R6. |
-| Low-to-high/high-to-low extrapolation | Stronger stress test | Use as supplement. |
-| Historical single-current DB post-hoc transfer | Debug/triage only | Not enough for final claims. |
-| Condition-level multi-current fit | Optional fallback | Use only if cell-level fitting is computationally infeasible, and label claims as partial. |
-
-### How to verify
-
-- Every ATF cell has one six-sweep fitting record or an explicit failure reason, including its DH/VH region label.
-- Every sweep appears once as held-out for each eligible cell.
-- Prediction RMSE/features are reported per cell, region, condition, and sweep.
-- Prediction bands are generated from accepted ensembles.
-- Posterior predictive feature checks are generated for `region × condition × sweep` groups and region-pooled summaries are labeled as secondary.
-- Failures are reported as limitations, not hidden.
-
-### Gherkin specifications
-
-```gherkin
-@step06 @R2 @R6 @cell-six-sweep
-Feature: cell-specific six-sweep model fitting
-  Scenario: each ATF cell is fit with one shared parameter set across six sweeps
-    Given an ATF-derived cell with six sweeps
-    When the cell-specific fitting pipeline runs
-    Then one shared biological/effective parameter set is optimized across all six sweeps
-    And the cell's DH or VH region label is preserved in the fit output
-    And sweep-specific stimulus amplitudes are monotone increasing
-    And the output reports trace, feature, binary-feature, prior, and failure-penalty loss components
-```
-
-```gherkin
-@step06 @R6 @cross-validation
-Feature: leave-one-sweep-out predictive validation
-  Scenario: each sweep is predicted from the other five sweeps
-    Given a cell with six pump-current sweeps
-    When the multi-sweep model is fit on five sweeps
-    Then the held-out sweep trace and features are predicted
-    And the error table reports trace loss and feature loss
-    And prediction bands are saved
-```
-
-```gherkin
-@step06 @R6 @extrapolation
-Feature: low-to-high and high-to-low predictive checks
-  Scenario: accepted mechanisms are stress-tested outside fitted sweep ranges
-    Given accepted fits from low-sweep training data
-    When high-sweep traces are predicted
-    Then prediction errors are compared by mechanism cluster
-    And clusters that diverge are flagged as non-equivalent outside the fitted regime
-```
-
-```gherkin
-@step06 @R2 @R6 @posterior-predictive
-Feature: population-level posterior predictive feature checks
-  Scenario: accepted ensembles reproduce empirical feature distributions
-    Given accepted cell-level ensembles and empirical ATF feature thresholds
-    When simulated features are summarized by region, condition, and sweep
-    Then empirical and simulated medians, IQRs, and coverage rates are reported
-    And model failures to reproduce group variability are reported as limitations
-```
-
-```gherkin
-@step06 @R2 @region-aware-errors
-Feature: predictive errors are not hidden by region pooling
-  Scenario: held-out prediction metrics are summarized separately for DH and VH
-    Given leave-one-sweep-out results for fitted ATF cells
-    When validation summaries are generated
-    Then RMSE, feature loss, binary-feature accuracy, and coverage are reported by region, condition, and sweep
-    And pooled summaries are labeled secondary
-    And a region-specific failure cannot be hidden by a good pooled score
-```
-
-### Notebook required
-
-`analysis/06_cell_six_sweep_predictive_validation.ipynb`
-
-
-## Step 07 — Parameter plausibility and constrained inference
-
-**Pareto rank:** 7. Turns parameter criticism into a controlled interpretation.
-
-**Primary output:** `outputs/plausibility/parameter_distribution_audit.csv`, `outputs/plausibility/constrained_vs_unconstrained.csv`.
-
-### Scientific objectives
-
-1. **Resolve R4 strongly:** distinguish physiological parameters from effective model-reduction parameters.
-2. **Resolve R1 partially:** show whether degeneracy-like structure persists under constrained priors.
-
-### Technical objectives
-
-- Define literature/working ranges for raw and effective parameters.
-- Report median/IQR/range per region/condition/sweep/cluster, with pooled summaries marked secondary.
-- Join plausibility tables with profile/FIM classifications from Step 03.
-- Classify each parameter as `within_range`, `out_of_range`, `effective_only`, `identifiable`, `weakly_identifiable`, or `physiologically_interpretable`.
-- Rerun constrained inference or apply penalties.
-- Compare fit quality, CV error, accepted ensemble size, and mechanism clusters by region and condition.
-
-### Approaches to compare
-
-| Approach | Use | Selection rule |
-|---|---|---|
-| Post-hoc plausibility audit | Immediate | Required for all accepted fits. |
-| Penalized inference | Main constrained analysis | Prefer if hard bounds cause solver instability. |
-| Hard bounded refit | Sensitivity | Use for parameters with clear physical ranges. |
-
-### How to verify
-
-- Every reported parameter has units or is explicitly labeled dimensionless/effective.
-- Out-of-range parameters are flagged.
-- Claims are based on effective combinations when raw values are not separately identifiable.
-- Plausibility summaries are stratified by DH/VH region when cell-level fits are available.
-- A parameter inside its biological range is not called physiologically interpretable unless Step 03 also supports identifiability.
-
-### Gherkin specifications
-
-```gherkin
-@step07 @R4 @plausibility
-Feature: parameter plausibility audit
-  Scenario: every accepted parameter is classified against its intended interpretation
-    Given accepted fits and a parameter-range specification
-    When the plausibility audit runs
-    Then each raw and effective parameter is labeled within_range, out_of_range, or effective_only
-    And out-of-range raw parameters are not interpreted as direct physiology
-```
-
-```gherkin
-@step07 @R4 @constrained-inference
-Feature: constrained inference tests whether conclusions survive physiological priors
-  Scenario: constrained and unconstrained fits are compared
-    Given an unconstrained accepted ensemble
-    When inference is rerun with priors or penalties
-    Then fit quality, CV error, accepted ensemble size, and mechanism clusters are compared
-    And loss of the degeneracy claim is reported if it occurs
-```
-
-### Notebook required
-
-`analysis/07_parameter_plausibility.ipynb`
+`analysis/07_assumption_sensitivity.ipynb`
 
 ---
 
-## Step 08 — Perturbation robustness
+## Step 08 — Parameter plausibility and constrained reruns
 
-**Pareto rank:** 8. Turns mechanism differences into testable predictions.
+**Pareto rank:** 8. Converts accepted-ensemble results into biophysically cautious parameter interpretation.
 
-**Primary output:** `outputs/perturbations/perturbation_sweep_summary.csv`, `outputs/perturbations/homeostasis_stability_by_cluster.csv`.
+**Primary output:** `outputs/parameter_plausibility/parameter_range_audit.csv`, `outputs/parameter_plausibility/effective_parameter_plausibility.csv`, `outputs/parameter_plausibility/constrained_rerun_comparison.csv`, `outputs/parameter_plausibility/interpretability_status.csv`.
 
 ### Scientific objectives
 
-1. **Resolve R6 strongly:** test robustness beyond fitted traces.
-2. **Resolve R5 strongly:** show how mechanism clusters respond differently to perturbations.
-3. **Resolve R3 partially:** evaluate bath coupling and stimulus assumptions.
+1. **Resolve R4 strongly:** quantify whether accepted parameters are within plausible ranges and whether they are identifiable.
+2. **Resolve R1 partially:** avoid labeling broad or boundary-hit parameter distributions as mechanisms.
+3. **Resolve R5 partially:** keep only physiologically interpretable mechanism claims in the main text, moving weakly interpretable claims to limitations or supplement.
 
 ### Technical objectives
 
-- Perturb `epsilon`, baseline `K_o`, stimulus duration, stimulus amplitude, and selected physiological/effective parameters.
-- Simulate accepted representatives and ensembles.
-- Classify homeostasis stability using Vm final error, K_o peak, K_o recovery, and finite-state criteria.
-- Compare cluster-level perturbation responses by region and condition where cell-level ensembles are available.
+- Report raw and effective parameter distributions by region, condition, mechanism cluster, and accepted-candidate status.
+- Compare accepted parameter ranges with documented broad physiological or modeling ranges.
+- Distinguish:
+  - `within_range`;
+  - `out_of_range`;
+  - `weakly_identified`;
+  - `effective_only`;
+  - `physiologically_interpretable`.
+- Run constrained or penalized refits for high-priority cells/mechanism clusters.
+- Compare unconstrained versus constrained fits by trace error, feature pass rate, held-out prediction, mechanism decomposition, and perturbation robustness.
 
 ### Approaches to compare
 
 | Approach | Use | Selection rule |
 |---|---|---|
-| Representative perturbations | First visual diagnostic | Use for figures. |
-| Full accepted-ensemble perturbations | Reviewer-facing robustness | Use for statistics. |
-| One-at-a-time perturbations | Interpretability | Required initially. |
-| Latin hypercube perturbations | Optional | Use if interactions are important. |
+| Broad plausibility audit | Primary | Required for all accepted ensembles. |
+| Effective-parameter plausibility | Primary | Use for reduced-model interpretation. |
+| Constrained reruns | Targeted | Use for parameters repeatedly out of range or boundary-hit. |
+| Penalty priors | Optional | Use when hard constraints degrade fit unrealistically. |
 
 ### How to verify
 
-- Each perturbation has baseline and perturbed simulations.
-- Stability criteria are explicit.
-- Cluster divergence is quantified.
-- Perturbation robustness summaries report DH and VH separately before pooled results.
+- Every reported parameter has a plausibility and identifiability status.
+- Effective parameters are separated from raw parameters.
+- Constrained rerun comparison states whether reviewer-facing mechanism conclusions persist.
+- A parameter inside bounds is not automatically labeled interpretable if Step 03 shows weak identifiability.
 
 ### Gherkin specifications
 
 ```gherkin
-@step08 @R6 @perturbations
-Feature: accepted mechanisms are stress-tested under perturbations
-  Scenario: perturbation sweeps produce stability classifications
-    Given accepted representative fits and perturbation definitions
-    When the perturbation pipeline runs
-    Then each simulation has finite status, flux summary, proxy validity, and homeostasis stability
-    And cluster-level robustness is summarized
+@step08 @R4 @parameter-plausibility
+Feature: accepted parameters are audited for plausibility and identifiability
+  Scenario: each accepted parameter receives an interpretation status
+    Given accepted cell ensembles and Step 03 identifiability results
+    When parameter plausibility is audited
+    Then each parameter is labeled within_range or out_of_range
+    And each parameter is labeled identifiable, weakly_identified, or effective_only
+    And physiologically_interpretable is true only when both plausibility and identifiability criteria support it
 ```
 
 ```gherkin
-@step08 @R5 @mechanism-prediction
-Feature: mechanism clusters generate testable predictions
-  Scenario: distinct mechanisms diverge under perturbation
-    Given two accepted clusters with similar fitted function
-    When bath coupling or stimulus duration is perturbed
-    Then predicted K_o recovery or Vm recovery differs beyond tolerance
-    And this difference is reported as a testable model prediction
+@step08 @R4 @constrained-rerun
+Feature: constrained inference tests whether claims depend on implausible parameters
+  Scenario: constrained and unconstrained accepted ensembles are compared
+    Given a set of high-priority cells or mechanism clusters
+    When constrained reruns are performed
+    Then fit quality, prediction, and mechanism metrics are compared
+    And claims that disappear under reasonable constraints are downgraded
 ```
 
 ### Notebook required
 
-`analysis/08_perturbation_robustness.ipynb`
+`analysis/08_parameter_plausibility_and_constrained_reruns.ipynb`
 
 ---
 
-## Step 09 — Manuscript figures, units, and reviewer-facing outputs
+## Step 09 — Reviewer-facing figures, tables, and rebuttal traceability
 
-**Pareto rank:** 9. Required for resubmission clarity after analyses are correct.
+**Pareto rank:** 9. Turns the computational pipeline into manuscript and response-letter material.
 
-**Primary output:** `outputs/figures/main_*.png`, `outputs/figures/supplement_*.png`, `outputs/manuscript_tables/*.csv`.
+**Primary output:** `outputs/reviewer_figures/figure_manifest.csv`, `outputs/reviewer_figures/reviewer_traceability_table.csv`, `outputs/reviewer_figures/main_figure_sources.csv`, `outputs/reviewer_figures/supplement_figure_sources.csv`.
 
 ### Scientific objectives
 
-1. **Resolve R7 strongly:** replace cluttered traces with composite panels, bands, and summaries.
-2. **Resolve R1-R6 presentation:** make every claim traceable to a table, diagnostic, and figure.
+1. **Resolve R7 strongly:** produce clear figures, units, axes, layouts, and tables.
+2. **Resolve R1–R6 communication:** map every claim to the exact computational output that supports it.
+3. **Avoid overclaiming:** separate full, partial, provisional, and unsupported claims in the response letter and manuscript.
 
 ### Technical objectives
 
-- Generate one main figure for definitions/identifiability/mechanisms.
-- Generate one predictive validation figure.
-- Generate one mechanism-decomposition figure.
-- Generate supplementary figures for thresholds, parameter plausibility, assumption sensitivity, perturbations.
-- Use region-faceted panels or matched DH/VH subpanels for ATF feature, fit, validation, and posterior predictive figures.
-- Enforce units and axis labels.
-- Generate a `figure_traceability_table.csv` mapping each figure/table to reviewer critique IDs, source notebook, and source output files.
+- Build a traceability table mapping every output figure/table to reviewer critique IDs.
+- Export manuscript-ready figures from Steps 00–08.
+- Use consistent units and labels.
+- Prefer composite panels and uncertainty bands over many individual traces.
+- Include figure source CSVs for every plotted panel.
+- Generate a claim table with:
+  - claim text;
+  - critique IDs addressed;
+  - source notebook;
+  - source output file;
+  - claim strength;
+  - unresolved limitation.
 
-### Approaches to compare
+### Required figure families
 
-| Approach | Use | Selection rule |
+| Figure family | Source steps | Purpose |
 |---|---|---|
-| Spaghetti trace plots | Avoid except debug | Replace with bands and representative traces. |
-| Composite grid panels | Main figure style | Use consistent axes and units. |
-| Tables with pass/fail flags | Supplement | Use for traceability. |
-
-### How to verify
-
-- Figure-generation notebook runs without manual edits.
-- Every figure has units, labels, legends, and panel titles.
-- Figures that use ATF cells identify whether panels are DH, VH, or pooled sensitivity summaries.
-- Tables can be regenerated from source outputs.
-- Figure traceability table maps every reviewer-facing panel to at least one critique ID.
+| Data/provenance/thresholds | 00, 02 | R2/R7: show dataset contract and empirical uncertainty. |
+| Identifiability/effective parameters | 01, 03 | R1/R4: show non-separability, sloppiness, and effective reporting coordinates. |
+| Cell-specific fit and held-out prediction | 04, 06 | R2/R4/R6: show robust accepted ensembles and predictive validation. |
+| Mechanistic decomposition | 05 | R5: show Kir/gap/leak regimes. |
+| Assumption sensitivity | 07 | R3: show robustness to gating/proxy/split choices. |
+| Parameter plausibility | 08 | R4: show constrained interpretation. |
 
 ### Gherkin specifications
 
 ```gherkin
-@step09 @R7 @figures
-Feature: publication figures are generated reproducibly
-  Scenario: every reviewer-facing figure has labeled units and traceable source data
-    Given analysis output tables
-    When the figure notebook runs
-    Then every figure is written to outputs/figures
-    And every axis has a non-empty label with units where applicable
-    And every panel source table is recorded
-    And ATF-derived panels explicitly state DH, VH, or pooled sensitivity scope
+@step09 @R7 @traceability
+Feature: every figure and table is traceable to reviewer objections
+  Scenario: reviewer-facing outputs are assembled
+    Given outputs from Steps 00 through 08
+    When the figure manifest is generated
+    Then every figure panel has a source file
+    And every figure panel maps to one or more reviewer critique IDs
+    And every claim has a claim strength and limitation field
+```
+
+```gherkin
+@step09 @R7 @figure-quality
+Feature: manuscript-ready figures have consistent units and layouts
+  Scenario: figures are exported for manuscript use
+    Given figure source tables
+    When reviewer-facing figures are generated
+    Then axes have units
+    And panels have consistent labels
+    And uncertainty bands are preferred over excessive overplotted traces
 ```
 
 ### Notebook required
 
-`analysis/09_manuscript_figures.ipynb`
+`analysis/09_reviewer_figures_and_traceability.ipynb`
 
 ---
 
-# Additional backlog from the technical suggestions
+## Claim-strength vocabulary
 
-The following items are lower priority than the steps above but should be added if time allows.
+All notebooks that produce reviewer-facing tables must use this vocabulary.
 
-| Backlog item | Related critiques | When to add |
-|---|---|---|
-| Full STRIKE-GOLDD or symbolic structural-identifiability report | R1 | Optional after Step 03; start with exact `d × pk` proof and only claim formal structural identifiability if implemented. |
-| Bayesian or approximate posterior sampling | R1, R6 | After accepted-ensemble pipeline is stable. |
-| Disk caching for simulations | Implementation | After post-fit and perturbation sweeps become slow. |
-| Parallel postfit/perturbation workers | Implementation | After cache keys are validated. |
-| Model variant with explicit ECS compartment | R3 | Only if proxy validity often fails. |
-| Single-state intracellular model variant | R3 | Add after gating-family comparison. |
-| Manuscript equation cleanup and notation table | R7 | In parallel with Step 09. |
-| Region-aware Methods paragraph and limitations text | R2, R7 | In parallel with Step 02/06; state DH/VH counts, unpaired design, and no animal/slice IDs. |
+| Claim strength | Meaning |
+|---|---|
+| `debug_only` | Useful for implementation or troubleshooting, not reviewer-facing. |
+| `provisional` | Suggestive result that requires a later step for final claim support. |
+| `partial_response` | Addresses part of a reviewer objection but leaves stated limitations. |
+| `reviewer_facing_supported` | Supported by data, acceptance criteria, mechanism analysis, and appropriate validation for the claim scope. |
+| `downgraded_by_validation` | Initial result failed prediction, perturbation, plausibility, or assumption-sensitivity checks. |
+| `unsupported` | Should not be used as a manuscript claim. |
 
-# Minimal CI contract
+## Minimal reviewer-facing claim path
 
-Add these commands to the repository CI as soon as the first two steps are committed:
+The strongest defensible path for the central degeneracy claim is:
 
-```bash
-pytest -q tests/test_00_data_provenance_audit.py
-pytest -q tests/test_01_postfit_sqlite_pipeline.py
-```
-
-As later steps are implemented, add one test file and one notebook smoke execution per step:
-
-```bash
-pytest -q tests/test_02_atf_thresholds.py
-pytest -q tests/test_02_region_design_contract.py
-pytest -q tests/test_03_combined_identifiability.py
-pytest -q tests/test_04_mechanistic_decomposition.py
-pytest -q tests/test_05_assumption_sensitivity.py
-pytest -q tests/test_06_cell_six_sweep_validation.py
-pytest -q tests/test_07_parameter_plausibility.py
-pytest -q tests/test_08_perturbation_robustness.py
-pytest -q tests/test_09_figures.py
-```
+1. Step 03 shows that raw parameter multiplicity is not automatically degeneracy.
+2. Step 04 builds accepted cell-level six-sweep ensembles with held-out prediction screens.
+3. Step 05 shows whether accepted ensembles form mechanism-distinct candidate regimes or only continuous compensation manifolds.
+4. Step 06 tests whether candidate regimes preserve predictions and K-buffering function under held-out currents and perturbations.
+5. Step 07 tests whether the conclusion is robust to model assumptions.
+6. Step 08 limits parameter interpretation to plausible and identifiable/effective coordinates.
+7. Step 09 maps only supported claims into figures and response text.
+The term `degeneracy` should be used only when mechanism-distinct accepted regimes preserve function under prediction or perturbation. Otherwise use `non-identifiability`, `sloppiness`, `parameter compensation`, or `compensation manifold`.
