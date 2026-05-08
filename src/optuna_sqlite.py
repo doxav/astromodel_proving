@@ -1,11 +1,4 @@
-"""Direct Optuna SQLite readers used by the reviewer-response pipeline.
-
-The historical optimization results are stored in Optuna SQLite databases, but the
-reviewer-response pipeline must not depend on an Optuna runtime just to inspect
-those studies.  This module provides a stable, testable reader that works with
-plain ``sqlite3`` and returns normalized parameter dictionaries that can be fed
-into :mod:`src.astro_model`.
-"""
+"""Direct Optuna SQLite readers used by the reviewer-response pipeline."""
 
 from __future__ import annotations
 
@@ -14,7 +7,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Mapping, Sequence
+from typing import Any, Dict, Mapping, Sequence
 
 import pandas as pd
 
@@ -101,7 +94,6 @@ def _read_trial_params(conn: sqlite3.Connection, trial_id: int) -> Dict[str, Any
         (trial_id,),
     ).fetchall()
     params_from_rows = {str(name): _decode_distribution_value(value, distribution_json) for name, value, distribution_json in rows}
-
     fixed = conn.execute(
         """
         SELECT value_json
@@ -125,7 +117,6 @@ def read_db_study_summary(db_path: str | Path) -> Dict[str, Any]:
     missing = sorted(required_tables - tables)
     if missing:
         raise ValueError(f"{db_path.name} is missing required tables: {missing}")
-
     with sqlite3.connect(str(db_path)) as conn:
         study_name = str(conn.execute("SELECT study_name FROM studies LIMIT 1").fetchone()[0])
         spec = parse_study_name(study_name)

@@ -1,5 +1,4 @@
-trace_source,condition,rows,n_columns,time_start_ms,time_end_ms,dt_ms,uses_header,file_size_bytes
-BARIUM_TRACES.csv,BARIUM,364969,7,0.0,72993.5999995,0.19999999999998863,False,24883254
-CONTROL_TRACES.csv,CONTROL,50031,7,0.0,50030.0,1.0,False,3100699
-CONTROL_TRACES_old.csv,CONTROL,500,7,0.0,49900.0,100.0,True,40563
-MFA_TRACES.csv,MFA,364969,7,0.0,72993.5999995,0.19999999999998863,False,25187251
+trace_source,condition,rows,n_columns,time_start_ms,time_end_ms,dt_ms,uses_header,file_size_bytes,dataset_kind
+BARIUM_TRACES.csv,BARIUM,364969,7,0.0,72993.5999995,0.1999999999999886,False,24883254,legacy_optuna_trace_csv
+CONTROL_TRACES.csv,CONTROL,50031,7,0.0,50030.0,1.0,False,3100699,legacy_optuna_trace_csv
+MFA_TRACES.csv,MFA,364969,7,0.0,72993.5999995,0.1999999999999886,False,25187251,legacy_optuna_trace_csv

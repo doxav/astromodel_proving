@@ -1,0 +1,5 @@
+dataset_kind,path_pattern,role,used_in_steps,reviewer_priority,notes
+legacy_optuna_db,data/1_Initial_xp_fit/*.db,Historical single-current fit archive.,"00,01",legacy_context_only,"Best used for provenance audit, structural confounding, and provisional mechanism summaries."
+legacy_optuna_trace_csv,data/1_Initial_xp_fit/*_TRACES.csv,Historical target traces used when the original Optuna objectives were computed.,"00,01",legacy_context_only,CONTROL_TRACES_old.csv was removed and must not be used.
+legacy_threshold_example_csv,data/threshold_for_good_enough_fits(TO BE RECOMPUTED BASED ON ATF 2_K+ Pumpts Data).csv,Legacy threshold example kept only for provenance/reference.,00,legacy_context_only,Thresholds must be rebuilt from ATF data in step 02.
+new_atf_trace,data/2_K+ Pumps Data/*.atf,New reviewer-facing experimental traces for region-aware thresholds and future six-sweep fitting.,"00,02+",primary_reviewer_dataset,DH/VH region and CONTROL/MFA/MFA_BA condition are first-class factors.

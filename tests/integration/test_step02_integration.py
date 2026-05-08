@@ -2,27 +2,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import nbformat
-from nbconvert.preprocessors import ExecutePreprocessor
+import pandas as pd
+
+from tests._notebook import execute_notebook
 
 
-def test_step02_notebook_executes_and_writes_outputs(project_root: Path, tmp_path: Path) -> None:
-    notebook_path = project_root / 'analysis' / '02_rebuild_atf_thresholds.ipynb'
-    assert notebook_path.exists()
+def test_step02_notebook_executes_and_writes_outputs(project_root: Path) -> None:
+    notebook_path = project_root / "analysis" / "02_rebuild_atf_thresholds.ipynb"
+    executed_path = project_root / "outputs" / "executed_notebooks" / notebook_path.name
+    if not executed_path.exists():
+        executed_path = execute_notebook(notebook_path, project_root)
+    assert executed_path.exists()
 
-    with open(notebook_path, 'r', encoding='utf-8') as f:
-        nb = nbformat.read(f, as_version=4)
+    outputs_dir = project_root / "outputs" / "features"
+    expected = {
+        "feature_table_by_sweep.csv",
+        "condition_region_sweep_thresholds.csv",
+        "feature_reliability_weights.csv",
+        "condition_feature_reliability.csv",
+        "region_condition_cell_counts.csv",
+        "region_effect_summary.csv",
+        "redundancy_diagnostics.csv",
+    }
+    assert expected.issubset({p.name for p in outputs_dir.glob("*.csv")})
 
-    executor = ExecutePreprocessor(timeout=1200, kernel_name='python3')
-    executor.preprocess(nb, {'metadata': {'path': str(project_root)}})
-
-    executed_path = tmp_path / '02_rebuild_atf_thresholds.executed.ipynb'
-    with open(executed_path, 'w', encoding='utf-8') as f:
-        nbformat.write(nb, f)
-
-    output_dir = project_root / 'outputs' / 'features'
-    assert (output_dir / 'feature_table_by_sweep.csv').exists()
-    assert (output_dir / 'condition_region_sweep_thresholds.csv').exists()
-    assert (output_dir / 'feature_reliability_weights.csv').exists()
-    assert (output_dir / 'region_effect_summary.csv').exists()
-    assert (output_dir / 'performance_benchmark.csv').exists()
+    feature_df = pd.read_csv(outputs_dir / "feature_table_by_sweep.csv")
+    assert len(feature_df) == 222

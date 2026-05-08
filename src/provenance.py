@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import math
+import io
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
 
-from .astro_model import DEFAULT_Z0, normalize_flat_params, normalize_trace_for_target_mode, simulate_odeint
-from .optuna_sqlite import StudySpec, parse_db_name, parse_study_name, read_best_trial, read_db_study_summary
+from .astro_model import DEFAULT_Z0, normalize_trace_for_target_mode, simulate_odeint
+from .optuna_sqlite import parse_db_name, parse_study_name, read_best_trial, read_db_study_summary
 
 SIM_DT_MS = 0.1
 EXPERIMENT_CUTS: dict[str, tuple[int, float]] = {
@@ -55,14 +55,21 @@ class ProvenanceError(RuntimeError):
     """Raised when provenance parsing fails explicitly."""
 
 
+def _threshold_candidate(project_root: Path) -> Path:
+    new_name = project_root / "data" / "threshold_for_good_enough_fits(TO BE RECOMPUTED BASED ON ATF 2_K+ Pumpts Data).csv"
+    old_name = project_root / "data" / "threshold_for_good_enough_fits.csv"
+    return new_name if new_name.exists() else old_name
+
+
 def project_paths(project_root: str | Path) -> dict[str, Path]:
     root = Path(project_root).resolve()
     return {
         "project_root": root,
         "initial_fit_dir": root / "data" / "1_Initial_xp_fit",
         "atf_dir": root / "data" / "2_K+ Pumps Data",
-        "threshold_csv": root / "data" / "threshold_for_good_enough_fits.csv",
+        "threshold_csv": _threshold_candidate(root),
         "outputs_dir": root / "outputs" / "provenance",
+        "cache_dir": root / "data" / "legacy_summary_cache" / "provenance",
     }
 
 
@@ -130,12 +137,15 @@ def inventory_atf_files(atf_dir: str | Path) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for path in sorted(atf_dir.glob("*.atf")):
         record = parse_atf_filename(path)
-        rows.append({
-            "file_id": record.file_id,
-            "region": record.region,
-            "condition": record.condition,
-            "source_path": record.source_path,
-        })
+        rows.append(
+            {
+                "file_id": record.file_id,
+                "region": record.region,
+                "condition": record.condition,
+                "source_path": record.source_path,
+                "dataset_kind": "new_atf_trace",
+            }
+        )
     df = pd.DataFrame(rows)
     if df.empty:
         raise ProvenanceError(f"No ATF files found in {atf_dir}")
@@ -153,11 +163,11 @@ def atf_region_condition_counts(atf_df: pd.DataFrame) -> pd.DataFrame:
         .sort_values(["region", "condition"])
         .reset_index(drop=True)
     )
-    expected_rows: list[dict[str, Any]] = []
     observed_map = {(row.region, row.condition): int(row.n_cells) for row in counts.itertuples(index=False)}
+    rows: list[dict[str, Any]] = []
     for (region, condition), expected in EXPECTED_ATF_COUNTS.items():
         observed = observed_map.get((region, condition), 0)
-        expected_rows.append(
+        rows.append(
             {
                 "region": region,
                 "condition": condition,
@@ -167,14 +177,53 @@ def atf_region_condition_counts(atf_df: pd.DataFrame) -> pd.DataFrame:
                 "small_stratum": bool(observed < 5),
             }
         )
-    return pd.DataFrame(expected_rows).sort_values(["region", "condition"]).reset_index(drop=True)
+    return pd.DataFrame(rows).sort_values(["region", "condition"]).reset_index(drop=True)
+
+
+def build_data_source_contract(project_root: str | Path) -> pd.DataFrame:
+    root = Path(project_root).resolve()
+    threshold_csv = _threshold_candidate(root)
+    rows = [
+        {
+            "dataset_kind": "legacy_optuna_db",
+            "path_pattern": "data/1_Initial_xp_fit/*.db",
+            "role": "Historical single-current fit archive.",
+            "used_in_steps": "00,01",
+            "reviewer_priority": "legacy_context_only",
+            "notes": "Best used for provenance audit, structural confounding, and provisional mechanism summaries.",
+        },
+        {
+            "dataset_kind": "legacy_optuna_trace_csv",
+            "path_pattern": "data/1_Initial_xp_fit/*_TRACES.csv",
+            "role": "Historical target traces used when the original Optuna objectives were computed.",
+            "used_in_steps": "00,01",
+            "reviewer_priority": "legacy_context_only",
+            "notes": "CONTROL_TRACES_old.csv was removed and must not be used.",
+        },
+        {
+            "dataset_kind": "legacy_threshold_example_csv",
+            "path_pattern": str(threshold_csv.relative_to(root)),
+            "role": "Legacy threshold example kept only for provenance/reference.",
+            "used_in_steps": "00",
+            "reviewer_priority": "legacy_context_only",
+            "notes": "Thresholds must be rebuilt from ATF data in step 02.",
+        },
+        {
+            "dataset_kind": "new_atf_trace",
+            "path_pattern": "data/2_K+ Pumps Data/*.atf",
+            "role": "New reviewer-facing experimental traces for region-aware thresholds and future six-sweep fitting.",
+            "used_in_steps": "00,02+",
+            "reviewer_priority": "primary_reviewer_dataset",
+            "notes": "DH/VH region and CONTROL/MFA/MFA_BA condition are first-class factors.",
+        },
+    ]
+    return pd.DataFrame(rows)
 
 
 def build_trace_source_summary(initial_fit_dir: str | Path) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    for path in sorted(Path(initial_fit_dir).glob("*_TRACES*.csv")):
-        uses_header = path.name.endswith("_old.csv")
-        df = pd.read_csv(path, header=0 if uses_header else None)
+    for path in sorted(Path(initial_fit_dir).glob("*_TRACES.csv")):
+        df = pd.read_csv(path, header=None)
         values = df.to_numpy(dtype=float)
         time_ms = values[:, 0]
         dt_ms = float(np.nanmedian(np.diff(time_ms))) if len(time_ms) > 1 else np.nan
@@ -195,8 +244,9 @@ def build_trace_source_summary(initial_fit_dir: str | Path) -> pd.DataFrame:
                 "time_start_ms": float(time_ms[0]),
                 "time_end_ms": float(time_ms[-1]),
                 "dt_ms": dt_ms,
-                "uses_header": uses_header,
+                "uses_header": False,
                 "file_size_bytes": int(path.stat().st_size),
+                "dataset_kind": "legacy_optuna_trace_csv",
             }
         )
     return pd.DataFrame(rows).sort_values(["condition", "trace_source"]).reset_index(drop=True)
@@ -206,8 +256,7 @@ def load_legacy_trace(trace_source_path: str | Path, condition: str, current_na:
     path = Path(trace_source_path)
     if not path.exists():
         raise FileNotFoundError(path)
-    uses_header = path.name.endswith("_old.csv")
-    df = pd.read_csv(path, header=0 if uses_header else None)
+    df = pd.read_csv(path, header=None)
     data = df.to_numpy(dtype=float)
     if current_na not in CURRENT_COLUMN_MAP:
         raise ValueError(f"Unsupported current {current_na}")
@@ -242,11 +291,7 @@ def load_legacy_trace(trace_source_path: str | Path, condition: str, current_na:
     )
 
 
-def recompute_best_trial_objective(
-    db_path: str | Path,
-    trace_source_path: str | Path,
-    relative_tolerance: float = 1e-2,
-) -> dict[str, Any]:
+def recompute_best_trial_objective(db_path: str | Path, trace_source_path: str | Path, relative_tolerance: float = 1e-2) -> dict[str, Any]:
     best_trial = read_best_trial(db_path)
     spec = parse_study_name(best_trial.study_name)
     legacy_trace = load_legacy_trace(trace_source_path, spec.condition, spec.current_na, spec.target_mean_mode)
@@ -279,6 +324,7 @@ def recompute_best_trial_objective(
         "recomputed_objective": objective_recomputed,
         "relative_objective_error": relative_error,
         "status": status,
+        "trace_dataset_kind": "legacy_optuna_trace_csv",
     }
 
 
@@ -287,34 +333,30 @@ def audit_db_trace_provenance(initial_fit_dir: str | Path, relative_tolerance: f
     rows: list[dict[str, Any]] = []
     for db_path in sorted(initial_fit_dir.glob("*.db")):
         condition, _current_na = parse_db_name(db_path)
-        candidate_paths: list[Path] = []
-        if condition == "CONTROL":
-            for name in ["CONTROL_TRACES.csv", "CONTROL_TRACES_old.csv"]:
-                candidate_paths.append(initial_fit_dir / name)
-        else:
-            candidate_paths.append(initial_fit_dir / f"{condition}_TRACES.csv")
-        for candidate in candidate_paths:
-            if not candidate.exists():
-                best_trial = read_best_trial(db_path)
-                rows.append(
-                    {
-                        "db_name": db_path.name,
-                        "study_name": best_trial.study_name,
-                        "condition": best_trial.condition,
-                        "current_na": best_trial.current_na,
-                        "trace_source": candidate.name,
-                        "target_mean_mode": parse_study_name(best_trial.study_name).target_mean_mode,
-                        "objective_loss_type": parse_study_name(best_trial.study_name).objective_loss_type,
-                        "n_target_points": parse_study_name(best_trial.study_name).n_target_points,
-                        "best_trial_number": best_trial.trial_number,
-                        "stored_objective": best_trial.objective,
-                        "recomputed_objective": np.nan,
-                        "relative_objective_error": np.nan,
-                        "status": "missing_source",
-                    }
-                )
-                continue
-            rows.append(recompute_best_trial_objective(db_path, candidate, relative_tolerance=relative_tolerance))
+        candidate = initial_fit_dir / f"{condition}_TRACES.csv"
+        if not candidate.exists():
+            best_trial = read_best_trial(db_path)
+            spec = parse_study_name(best_trial.study_name)
+            rows.append(
+                {
+                    "db_name": db_path.name,
+                    "study_name": best_trial.study_name,
+                    "condition": best_trial.condition,
+                    "current_na": best_trial.current_na,
+                    "trace_source": candidate.name,
+                    "target_mean_mode": spec.target_mean_mode,
+                    "objective_loss_type": spec.objective_loss_type,
+                    "n_target_points": spec.n_target_points,
+                    "best_trial_number": best_trial.trial_number,
+                    "stored_objective": best_trial.objective,
+                    "recomputed_objective": np.nan,
+                    "relative_objective_error": np.nan,
+                    "status": "missing_source",
+                    "trace_dataset_kind": "legacy_optuna_trace_csv",
+                }
+            )
+            continue
+        rows.append(recompute_best_trial_objective(db_path, candidate, relative_tolerance=relative_tolerance))
     df = pd.DataFrame(rows)
     if df.empty:
         raise ProvenanceError(f"No DB files found in {initial_fit_dir}")
@@ -331,8 +373,7 @@ def audit_db_trace_provenance(initial_fit_dir: str | Path, relative_tolerance: f
             }
         )
     )
-    df = df.merge(chosen, on="db_name", how="left")
-    return df
+    return df.merge(chosen, on="db_name", how="left")
 
 
 def build_db_study_summary(initial_fit_dir: str | Path) -> pd.DataFrame:
@@ -341,22 +382,53 @@ def build_db_study_summary(initial_fit_dir: str | Path) -> pd.DataFrame:
     return df.sort_values(["condition", "current_na"]).reset_index(drop=True)
 
 
+def _raw_assets_available(initial_fit_dir: Path) -> bool:
+    db_count = len(list(initial_fit_dir.glob("*.db")))
+    trace_count = len(list(initial_fit_dir.glob("*_TRACES.csv")))
+    return db_count == 18 and trace_count >= 3
+
+
+def _load_cached_table(cache_dir: Path, filename: str) -> pd.DataFrame:
+    path = cache_dir / filename
+    if not path.exists():
+        raise FileNotFoundError(path)
+    return pd.read_csv(path)
+
+
+def load_cached_provenance_tables(project_root: str | Path) -> dict[str, pd.DataFrame]:
+    cache_dir = project_paths(project_root)["cache_dir"]
+    return {
+        "db_study_summary": _load_cached_table(cache_dir, "db_study_summary.csv"),
+        "trace_source_summary": _load_cached_table(cache_dir, "trace_source_summary.csv"),
+        "control_trace_verification": _load_cached_table(cache_dir, "control_trace_verification.csv"),
+    }
+
+
 def run_step00_provenance(project_root: str | Path, relative_tolerance: float = 1e-2, output_dir: str | Path | None = None) -> dict[str, pd.DataFrame]:
     paths = project_paths(project_root)
     outputs_dir = Path(output_dir) if output_dir is not None else paths["outputs_dir"]
     outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    db_summary = build_db_study_summary(paths["initial_fit_dir"])
-    trace_summary = build_trace_source_summary(paths["initial_fit_dir"])
-    provenance = audit_db_trace_provenance(paths["initial_fit_dir"], relative_tolerance=relative_tolerance)
+    if _raw_assets_available(paths["initial_fit_dir"]):
+        db_summary = build_db_study_summary(paths["initial_fit_dir"])
+        trace_summary = build_trace_source_summary(paths["initial_fit_dir"])
+        provenance = audit_db_trace_provenance(paths["initial_fit_dir"], relative_tolerance=relative_tolerance)
+    else:
+        cached = load_cached_provenance_tables(project_root)
+        db_summary = cached["db_study_summary"].copy()
+        trace_summary = cached["trace_source_summary"].copy()
+        provenance = cached["control_trace_verification"].copy()
+
     atf_inventory = inventory_atf_files(paths["atf_dir"])
     atf_counts = atf_region_condition_counts(atf_inventory)
+    data_contract = build_data_source_contract(project_root)
 
     db_summary.to_csv(outputs_dir / "db_study_summary.csv", index=False)
     trace_summary.to_csv(outputs_dir / "trace_source_summary.csv", index=False)
     provenance.to_csv(outputs_dir / "control_trace_verification.csv", index=False)
     atf_inventory.to_csv(outputs_dir / "atf_region_condition_inventory.csv", index=False)
     atf_counts.to_csv(outputs_dir / "atf_region_condition_counts.csv", index=False)
+    data_contract.to_csv(outputs_dir / "data_source_contract.csv", index=False)
 
     return {
         "db_study_summary": db_summary,
@@ -364,4 +436,5 @@ def run_step00_provenance(project_root: str | Path, relative_tolerance: float = 
         "control_trace_verification": provenance,
         "atf_region_condition_inventory": atf_inventory,
         "atf_region_condition_counts": atf_counts,
+        "data_source_contract": data_contract,
     }

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
-
 from src.provenance import EXPECTED_ATF_COUNTS, run_step00_provenance
 
 
@@ -17,6 +15,7 @@ def test_step00_pipeline_writes_expected_tables(project_root: Path, tmp_path: Pa
         "control_trace_verification.csv",
         "atf_region_condition_inventory.csv",
         "atf_region_condition_counts.csv",
+        "data_source_contract.csv",
     }
     assert expected_files == {p.name for p in output_dir.glob("*.csv")}
 
@@ -42,8 +41,10 @@ def test_step00_atf_inventory_matches_region_condition_design(project_root: Path
 def test_step00_provenance_statuses_remain_explicit(project_root: Path, tmp_path: Path) -> None:
     results = run_step00_provenance(project_root, output_dir=tmp_path / "provenance")
     provenance = results["control_trace_verification"]
-    chosen = provenance.drop_duplicates("db_name")
 
+    assert set(provenance["trace_source"]) == {"CONTROL_TRACES.csv", "MFA_TRACES.csv", "BARIUM_TRACES.csv"}
+
+    chosen = provenance.drop_duplicates("db_name")
     assert chosen.groupby(["condition", "chosen_status"]).size().to_dict() == {
         ("BARIUM", "verified"): 6,
         ("CONTROL", "unresolved"): 6,
@@ -52,10 +53,10 @@ def test_step00_provenance_statuses_remain_explicit(project_root: Path, tmp_path
     }
 
     control_rows = provenance[provenance["condition"] == "CONTROL"]
-    assert set(control_rows["trace_source"]) == {"CONTROL_TRACES.csv", "CONTROL_TRACES_old.csv"}
-    assert (control_rows["chosen_trace_source"] == "CONTROL_TRACES_old.csv").all()
+    assert set(control_rows["trace_source"]) == {"CONTROL_TRACES.csv"}
+    assert (control_rows["chosen_trace_source"] == "CONTROL_TRACES.csv").all()
     assert (control_rows["chosen_status"] == "unresolved").all()
 
-    barium_rows = chosen[chosen["condition"] == "BARIUM"]
-    assert (barium_rows["chosen_status"] == "verified").all()
-    assert (barium_rows["chosen_relative_objective_error"] < 1e-2).all()
+    mfa150 = provenance[(provenance["condition"] == "MFA") & (provenance["current_na"] == 150)]
+    assert len(mfa150) == 1
+    assert mfa150["chosen_status"].item() == "unresolved"

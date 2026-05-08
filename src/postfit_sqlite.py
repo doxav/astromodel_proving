@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -130,7 +130,7 @@ def top_trials_with_effective_parameters(initial_fit_dir: str | Path, top_n: int
             )
     df = pd.DataFrame(rows)
     if not df.empty:
-        df = df.sort_values(["condition", "current_na", "objective", "trial_number"], ascending=[True, True, True, True]).reset_index(drop=True)
+        df = df.sort_values(["condition", "current_na", "objective", "trial_number"]).reset_index(drop=True)
     return df
 
 
@@ -171,20 +171,56 @@ def effective_parameter_summary(initial_fit_dir: str | Path) -> pd.DataFrame:
     return df.sort_values(["condition", "current_na"]).reset_index(drop=True)
 
 
+def _project_paths(project_root: str | Path) -> dict[str, Path]:
+    root = Path(project_root).resolve()
+    return {
+        "project_root": root,
+        "initial_fit_dir": root / "data" / "1_Initial_xp_fit",
+        "outputs_dir": root / "outputs" / "postfit_sqlite",
+        "cache_dir": root / "data" / "legacy_summary_cache" / "postfit_sqlite",
+    }
+
+
+def _raw_assets_available(initial_fit_dir: Path) -> bool:
+    return len(list(initial_fit_dir.glob("*.db"))) == 18
+
+
+def _load_cached_table(cache_dir: Path, filename: str) -> pd.DataFrame:
+    path = cache_dir / filename
+    if not path.exists():
+        raise FileNotFoundError(path)
+    return pd.read_csv(path)
+
+
+def load_cached_postfit_tables(project_root: str | Path) -> dict[str, pd.DataFrame]:
+    cache_dir = _project_paths(project_root)["cache_dir"]
+    return {
+        "top_trials_all_dbs": _load_cached_table(cache_dir, "top_trials_all_dbs.csv"),
+        "effective_parameter_summary": _load_cached_table(cache_dir, "effective_parameter_summary.csv"),
+        "representative_mechanism_summary": _load_cached_table(cache_dir, "representative_mechanism_summary.csv"),
+    }
+
+
 def run_step01_postfit_sqlite(
     project_root: str | Path,
     top_n: int = 5,
     representative_dbs: Sequence[str] | None = None,
     output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    project_root = Path(project_root).resolve()
-    initial_fit_dir = project_root / "data" / "1_Initial_xp_fit"
-    outputs_dir = Path(output_dir) if output_dir is not None else project_root / "outputs" / "postfit_sqlite"
+    paths = _project_paths(project_root)
+    outputs_dir = Path(output_dir) if output_dir is not None else paths["outputs_dir"]
     outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    top_trials_df = top_trials_with_effective_parameters(initial_fit_dir, top_n=top_n)
-    effective_df = effective_parameter_summary(initial_fit_dir)
-    representative_df, simulations = representative_mechanism_summary(initial_fit_dir, representative_dbs=representative_dbs)
+    if _raw_assets_available(paths["initial_fit_dir"]):
+        top_trials_df = top_trials_with_effective_parameters(paths["initial_fit_dir"], top_n=top_n)
+        effective_df = effective_parameter_summary(paths["initial_fit_dir"])
+        representative_df, simulations = representative_mechanism_summary(paths["initial_fit_dir"], representative_dbs=representative_dbs)
+    else:
+        cached = load_cached_postfit_tables(project_root)
+        top_trials_df = cached["top_trials_all_dbs"].copy()
+        effective_df = cached["effective_parameter_summary"].copy()
+        representative_df = cached["representative_mechanism_summary"].copy()
+        simulations = {}
 
     top_trials_df.to_csv(outputs_dir / "top_trials_all_dbs.csv", index=False)
     effective_df.to_csv(outputs_dir / "effective_parameter_summary.csv", index=False)

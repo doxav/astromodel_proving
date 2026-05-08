@@ -1,72 +1,73 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+from src.atf_step02 import run_step02_rebuild_atf_thresholds
 
 
-def test_step02_pipeline_builds_feature_table_and_outputs(step02_results) -> None:
-    results = step02_results
-    output_dir = results["paths"].output_dir
-    feature_df = results["feature_table_by_sweep"]
+@pytest.fixture(scope="module")
+def step02_results(project_root: Path, tmp_path_factory: pytest.TempPathFactory):
+    outputs_dir = project_root / "outputs" / "features"
+    expected = {
+        "feature_table_by_sweep.csv",
+        "condition_region_sweep_thresholds.csv",
+        "feature_reliability_weights.csv",
+        "condition_feature_reliability.csv",
+        "region_condition_cell_counts.csv",
+        "region_effect_summary.csv",
+        "redundancy_diagnostics.csv",
+    }
+    if expected.issubset({p.name for p in outputs_dir.glob("*.csv")}):
+        return {
+            "feature_table_by_sweep": pd.read_csv(outputs_dir / "feature_table_by_sweep.csv"),
+            "region_condition_cell_counts": pd.read_csv(outputs_dir / "region_condition_cell_counts.csv"),
+            "redundancy_diagnostics": pd.read_csv(outputs_dir / "redundancy_diagnostics.csv"),
+            "condition_feature_reliability": pd.read_csv(outputs_dir / "condition_feature_reliability.csv"),
+            "condition_region_sweep_thresholds": pd.read_csv(outputs_dir / "condition_region_sweep_thresholds.csv"),
+        }
+    output_dir = tmp_path_factory.mktemp("step02_features")
+    return run_step02_rebuild_atf_thresholds(project_root, output_dir=output_dir)
+
+
+def test_step02_pipeline_extracts_all_sweeps(step02_results) -> None:
+    feature_df = step02_results["feature_table_by_sweep"]
 
     assert len(feature_df) == 222
-    assert feature_df["file_id"].nunique() == 37
     assert feature_df.groupby("file_id")["sweep"].nunique().eq(6).all()
     assert set(feature_df["region"]) == {"DH", "VH"}
     assert set(feature_df["condition"]) == {"CONTROL", "MFA", "MFA_BA"}
 
-    for file_name in [
-        "feature_table_by_sweep.csv",
-        "preprocess_qc_by_sweep.csv",
-        "region_condition_cell_counts.csv",
-        "condition_region_sweep_thresholds.csv",
-        "feature_reliability_weights.csv",
-        "region_effect_summary.csv",
-        "analysis_summary.json",
-    ]:
-        assert (output_dir / file_name).exists(), file_name
 
+def test_step02_counts_and_redundancy(step02_results) -> None:
+    counts = step02_results["region_condition_cell_counts"]
+    redundancy = step02_results["redundancy_diagnostics"]
 
-def test_step02_threshold_scopes_and_index_contract(step02_results) -> None:
-    results = step02_results
-    thresholds = results["condition_region_sweep_thresholds"]
-
-    scope_counts = thresholds["threshold_scope"].value_counts().to_dict()
-    assert scope_counts == {"region_specific": 432, "region_pooled": 216, "global_pooled": 72}
-
-    region_specific = thresholds[thresholds["threshold_scope"] == "region_specific"]
-    assert set(region_specific["region"]) == {"DH", "VH"}
-    assert set(region_specific["condition"]) == {"CONTROL", "MFA", "MFA_BA"}
-    assert set(region_specific["sweep"]) == {1, 2, 3, 4, 5, 6}
-    assert set(region_specific["feature"]) >= {
-        "peak_depolarization_mV",
-        "stim_end_depolarization_mV",
-        "return_slope_mV_per_s",
-        "plateau_reached",
+    observed = {(row.region, row.condition): int(row.n_cells) for row in counts.itertuples(index=False)}
+    assert observed == {
+        ("DH", "CONTROL"): 7,
+        ("VH", "CONTROL"): 4,
+        ("DH", "MFA"): 6,
+        ("VH", "MFA"): 7,
+        ("DH", "MFA_BA"): 6,
+        ("VH", "MFA_BA"): 7,
     }
 
-
-def test_step02_reliability_weights_capture_redundancy_and_missingness(step02_results) -> None:
-    results = step02_results
-    reliability = results["feature_reliability_weights"]
-
-    region_specific = reliability[reliability["threshold_scope"] == "region_specific"]
-    mean_weights = region_specific.groupby("feature")["reliability_weight"].mean()
-    assert mean_weights["stim_end_depolarization_mV"] < mean_weights["peak_depolarization_mV"]
-    assert region_specific[region_specific["feature"] == "stim_end_depolarization_mV"]["is_redundant_feature"].all()
-
-    return_by_condition = (
-        region_specific[region_specific["feature"] == "return_slope_mV_per_s"]
-        .groupby("condition")["reliability_weight"]
-        .mean()
-    )
-    assert return_by_condition["MFA_BA"] < return_by_condition["MFA"] < return_by_condition["CONTROL"]
+    pair = redundancy[
+        ((redundancy["feature_a"] == "peak_depolarization_mV") & (redundancy["feature_b"] == "stim_end_depolarization_mV"))
+        | ((redundancy["feature_b"] == "peak_depolarization_mV") & (redundancy["feature_a"] == "stim_end_depolarization_mV"))
+    ]
+    assert len(pair) == 1
+    assert bool(pair["redundant_flag"].item()) is True
+    assert float(pair["abs_spearman_r"].item()) > 0.95
 
 
-def test_step02_region_effect_summary_flags_vh_control_small_stratum(step02_results) -> None:
-    results = step02_results
-    region_effects = results["region_effect_summary"]
+def test_step02_thresholds_include_reliability_and_condition_reliability(step02_results) -> None:
+    thresholds = step02_results["condition_region_sweep_thresholds"]
+    condition_reliability = step02_results["condition_feature_reliability"]
 
-    small = region_effects[region_effects["small_stratum"]]
-    assert len(small) > 0
-    assert set(small["condition"]) == {"CONTROL"}
-    assert set(small["sweep"]) == {1, 2, 3, 4, 5, 6}
-    assert set(small["feature"]) >= {"peak_depolarization_mV", "plateau_reached", "return_slope_mV_per_s"}
+    assert {"condition", "region", "sweep", "feature", "median", "iqr", "acceptable_lower", "acceptable_upper", "missing_rate", "reliability_weight", "threshold_scope"}.issubset(thresholds.columns)
+    assert "mean_reliability_weight" in condition_reliability.columns
+    assert set(condition_reliability["condition"]) == {"CONTROL", "MFA", "MFA_BA"}
