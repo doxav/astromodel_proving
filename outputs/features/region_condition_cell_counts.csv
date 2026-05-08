@@ -1,0 +1,7 @@
+region,condition,n_cells,expected_n_cells,matches_expected,small_stratum
+DH,CONTROL,7,7,True,False
+DH,MFA,6,6,True,False
+DH,MFA_BA,6,6,True,False
+VH,CONTROL,4,4,True,True
+VH,MFA,7,7,True,False
+VH,MFA_BA,7,7,True,False

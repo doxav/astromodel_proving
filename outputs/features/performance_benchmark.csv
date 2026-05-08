@@ -1,0 +1,5 @@
+stage,engine,elapsed_seconds,n_rows,note,compute_speedup_numba_vs_numpy,estimated_total_gain_seconds,numba_decision
+preprocess,shared,24.901982950000274,60,parse_atf + robust artifact preprocessing for 37 files; extraction benchmark uses 10 files,,,
+feature_extraction,numpy,1.3781578529997205,60,extract_features over cached preprocessed traces,,,
+feature_extraction,numba,1.8497481819999848,60,extract_features over cached preprocessed traces (warm numba),,,
+decision,keep_numpy,30.00116700609924,60,step02 is dominated by ATF parsing and artifact preprocessing; numba does not change the primary bottleneck,0.7450516056243011,-1.744884217300978,keep_numpy_default

@@ -90,13 +90,13 @@ Consequences for the reviewer-response analyses:
 3. **Resolve R7 partially:** generate clean provenance tables and simple diagnostic plots for the methods supplement.
 4. **Resolve R2 partially:** audit DH/VH region labels and condition labels for the 37 ATF cells before downstream thresholding/fitting.
 
-This step is a partial response because it does not yet improve the model. It prevents false inference from mismatched sources, especially the current `CONTROL_TRACES.csv` versus `CONTROL_TRACES_old.csv` ambiguity.
+This step is a partial response because it does not yet improve the model. It prevents false inference from mismatched sources.
 
 ### Technical objectives
 
 - Discover exactly 18 SQLite DBs: 3 conditions × 6 currents.
 - Read Optuna SQLite summaries without importing Optuna.
-- Read all trace CSVs and detect multiple Control trace sources.
+- Read all trace CSVs and detect sources.
 - Parse ATF filenames/metadata to infer `region`, `condition`, and `file_id`; fail explicitly on unknown or ambiguous region labels.
 - Write an ATF inventory with expected counts by `region × condition`, including DH-control, VH-control, DH-MFA, VH-MFA, DH-MFA_BA, and VH-MFA_BA.
 - Recompute objective values for the best trial against each candidate trace source when the simulation and preprocessing contract is available.
@@ -111,7 +111,6 @@ This step is a partial response because it does not yet improve the model. It pr
 |---|---|---|
 | Direct SQLite audit | Always required | Must pass without Optuna. |
 | Objective recomputation against `*_TRACES.csv` | First candidate | Accept only if relative error is below threshold and preprocessing is documented. |
-| Objective recomputation against `CONTROL_TRACES_old.csv` | Required for Control | If this source matches better, record it as the Control provenance candidate. |
 | Objective recomputation from ATF-derived traces | Fallback | Use if neither historical CSV source matches the Control DB objective. |
 
 ### How to verify
@@ -120,7 +119,6 @@ This step is a partial response because it does not yet improve the model. It pr
 - The notebook `analysis/00_data_provenance_audit.ipynb` runs top-to-bottom.
 - Output tables contain all 18 DBs and all trace sources.
 - ATF inventory contains 37 files, both regions `DH` and `VH`, all three conditions, and no unknown-region files.
-- Control status is not silently marked verified unless a recomputed objective actually matches.
 
 ### Gherkin specifications
 
@@ -129,21 +127,11 @@ This step is a partial response because it does not yet improve the model. It pr
 Feature: Historical fitting-data provenance audit
   Scenario: all initial-fit inputs are discoverable without Colab or Optuna
     Given the repository data directory "data/1_Initial_xp_fit"
-    When the provenance audit scans SQLite DBs, trace CSVs, best-fit CSVs, and the threshold CSV
+    When the provenance audit scans SQLite DBs, trace CSVs, best-fit CSVs, and the threshold example CSV (to be later recomputed on ATF data)
     Then it finds 18 Optuna DB files
     And it finds 6 currents for each of CONTROL, MFA, and BARIUM
-    And it finds CONTROL_TRACES.csv, CONTROL_TRACES_old.csv, MFA_TRACES.csv, and BARIUM_TRACES.csv
+    And it finds CONTROL_TRACES.csv, MFA_TRACES.csv, and BARIUM_TRACES.csv
     And it writes a machine-readable inventory table
-```
-
-```gherkin
-@step00 @R2 @control-provenance
-Feature: Control trace ambiguity is explicit
-  Scenario: Control provenance cannot be assumed when multiple candidate sources exist
-    Given CONTROL_TRACES.csv and CONTROL_TRACES_old.csv are both present
-    When the audit cannot verify a unique objective match
-    Then the Control status is "unresolved"
-    And no downstream notebook may label Control fits as reviewer-facing validated
 ```
 
 ```gherkin
@@ -300,7 +288,7 @@ The notebook must show:
 3. **Resolve R7 partially:** create clean feature-reliability figures for supplement.
 4. **Resolve R2 strongly:** prevent DH/VH biological differences from being washed out by region-blind thresholds or pooled fits.
 
-This step is stronger than the legacy `threshold_for_good_enough_fits.csv` because the legacy threshold lacks condition-specific pharmacological structure and does not protect against DH/VH pooling artifacts.
+This step is stronger than the legacy `threshold_for_good_enough_fits(TO BE RECOMPUTED BASED ON ATF 2_K+ Pumpts Data).csv` because the legacy threshold lacks condition-specific pharmacological structure and does not protect against DH/VH pooling artifacts.
 
 ### Technical objectives
 

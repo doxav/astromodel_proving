@@ -1,0 +1,14 @@
+{
+  "n_files": 37,
+  "n_rows": 222,
+  "n_sweeps_per_file_min": 6,
+  "n_sweeps_per_file_max": 6,
+  "n_plateau_reached": 117,
+  "n_has_undershoot": 156,
+  "mean_artifact_fraction": 0.0010680356481726344,
+  "n_region_specific_threshold_rows": 432,
+  "n_region_pooled_threshold_rows": 216,
+  "n_global_pooled_threshold_rows": 72,
+  "redundant_pairs": 1,
+  "mean_reliability_weight": 0.8939177939177939
+}
