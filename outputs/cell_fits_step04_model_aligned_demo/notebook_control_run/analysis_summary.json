@@ -1,0 +1,24 @@
+{
+  "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
+  "implementation_mode": "shared-cell least-squares fitting with multi-start and leave-one-sweep-out validation",
+  "n_cells": 1,
+  "n_candidates": 1,
+  "n_accepted_candidates": 1,
+  "n_reviewer_facing_cells": 1,
+  "selected_file_ids": [
+    "1_DH_1_CONTROL"
+  ],
+  "n_fit_points": 10,
+  "n_starts": 1,
+  "max_nfev_all6": 2,
+  "max_nfev_holdout": 1,
+  "trace_rmse_accept": 18.0,
+  "feature_pass_accept": 0.3,
+  "heldout_trace_rmse_accept": 20.0,
+  "heldout_pass_accept": 0.3,
+  "heldout_min_pass_count": 3,
+  "accepted_top_k_per_cell": 3,
+  "uses_step02_thresholds": true,
+  "uses_region_specific_acceptance": true,
+  "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only"
+}

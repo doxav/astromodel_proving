@@ -1,0 +1,11 @@
+{
+  "notebook_name": "04_cell_specific_six_sweep_fitting.ipynb",
+  "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
+  "selected_file_ids": [
+    "1_DH_1_CONTROL"
+  ],
+  "n_cells": 1,
+  "n_accepted_candidates": 1,
+  "n_reviewer_facing_cells": 1,
+  "model_alignment": "expected_model_exact_with_numerical_safeguards_only"
+}

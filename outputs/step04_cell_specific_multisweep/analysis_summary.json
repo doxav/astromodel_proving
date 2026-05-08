@@ -1,0 +1,29 @@
+{
+  "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
+  "n_cells_total": 37,
+  "n_cells_run": 2,
+  "n_accepted_cells": 1,
+  "n_candidates_per_cell": 2,
+  "max_accepted_per_cell": 3,
+  "cell_selection_mode": "group_balanced",
+  "feature_mean_pass_threshold": 0.72,
+  "max_mean_trace_nrmse": 0.55,
+  "conditions_run": [
+    "CONTROL"
+  ],
+  "regions_run": [
+    "DH",
+    "VH"
+  ],
+  "current_contract": [
+    50,
+    75,
+    100,
+    125,
+    150,
+    175
+  ],
+  "outputs_subdir": "step04_cell_specific_multisweep",
+  "performance_benchmark_written": true,
+  "benchmark_recommended_default": "default"
+}

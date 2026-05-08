@@ -1,0 +1,3 @@
+file_id,region,condition,n_candidates,n_accepted_candidates,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,holdout_pass_count,holdout_mean_rmse_mV,holdout_mean_pass_fraction,cell_reviewer_facing
+DH_1_MFA,DH,MFA,1,1,DH_1_MFA__cand_01,5.076577188081262,0.3718409515018037,6,5.076577188081262,0.3718409515018037,True
+DH_1_MFA_BA,DH,MFA_BA,1,1,DH_1_MFA_BA__cand_01,4.194311463351879,0.375,6,4.194311463351879,0.375,True

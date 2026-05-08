@@ -1,0 +1,30 @@
+{
+  "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
+  "implementation_mode": "shared-cell parameter optimization using the reviewed ODE model",
+  "n_cells": 2,
+  "n_candidates": 6,
+  "n_accepted_candidates": 6,
+  "n_reviewer_facing_cells": 2,
+  "selected_file_ids": [
+    "1_DH_1",
+    "DH_1_MFA"
+  ],
+  "candidate_transform_names": [
+    "base",
+    "low_gap",
+    "high_gap"
+  ],
+  "n_fit_points": 20,
+  "trace_rmse_accept": 18.0,
+  "feature_pass_accept": 0.3,
+  "heldout_trace_rmse_accept": 22.0,
+  "heldout_pass_accept": 0.25,
+  "heldout_min_pass_count": 3,
+  "accepted_top_k_per_cell": 5,
+  "optimizer_method": "coordinate_grid",
+  "optimizer_maxiter_all6": 1,
+  "optimizer_maxiter_heldout": 0,
+  "uses_expected_reviewed_model": true,
+  "uses_step02_thresholds": true,
+  "uses_region_specific_acceptance": true
+}
