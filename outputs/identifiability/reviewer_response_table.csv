@@ -1,0 +1,5 @@
+critique_targeted,diagnostic,output_file,conclusion,limitation
+R1,d × pk invariance,invariance_diagnostics.csv,d/pk non-separable,not full STRIKE-GOLDD
+R1,FIM spectrum,fim_spectrum.csv,sloppy directions exist,local only
+R4,effective parameter map,effective_parameter_map.csv,report effective parameters,physiological interpretation still needs priors/ranges
+R7,interpretation notes,interpretation_notes.csv,clearer supplement,not a mechanistic result
