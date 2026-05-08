@@ -1,0 +1,38 @@
+{
+  "representative_dbs": [
+    "CONTROL_75nA.db",
+    "MFA_100nA.db",
+    "BARIUM_100nA.db"
+  ],
+  "n_timepoints": 180,
+  "profile_grid": [
+    0.25,
+    0.4,
+    0.63,
+    1.0,
+    1.6,
+    2.5,
+    4.0
+  ],
+  "fim_log_step": 0.03,
+  "observable_stride": 2,
+  "sigma_mV": 1.0,
+  "profile_parameter_spaces": [
+    "effective",
+    "raw"
+  ],
+  "fim_parameter_spaces": [
+    "effective",
+    "raw"
+  ],
+  "observable_designs": [
+    "sparse",
+    "dense"
+  ],
+  "claim_scope": "identifiability_screen_not_biological_degeneracy",
+  "representative_conditions": [
+    "CONTROL",
+    "MFA",
+    "BARIUM"
+  ]
+}

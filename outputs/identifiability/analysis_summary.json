@@ -1,0 +1,47 @@
+{
+  "notebook_name": "03_combined_identifiability_profiles_fim.ipynb",
+  "step_name": "Step 03A identifiability/effective-parameter/FIM screen",
+  "claim_scope": "identifiability_screen_not_biological_degeneracy",
+  "critiques_targeted": [
+    "R1",
+    "R4",
+    "partial R7"
+  ],
+  "critiques_not_resolved": [
+    "R2 empirical variability/noise",
+    "R3 model assumption sensitivity",
+    "R5 biological mechanism modes",
+    "R6 predictive robustness/CV"
+  ],
+  "representative_centers": [
+    {
+      "db_name": "CONTROL_75nA.db",
+      "condition": "CONTROL",
+      "current_na": 75,
+      "trial_number": 2425
+    },
+    {
+      "db_name": "MFA_100nA.db",
+      "condition": "MFA",
+      "current_na": 100,
+      "trial_number": 0
+    },
+    {
+      "db_name": "BARIUM_100nA.db",
+      "condition": "BARIUM",
+      "current_na": 100,
+      "trial_number": 0
+    }
+  ],
+  "n_profile_diagnostics": 9,
+  "n_fim_modes": 57,
+  "uses_raw_space_fim": true,
+  "uses_effective_space_fim": true,
+  "has_d_pk_invariance_check": true,
+  "has_interpretation_notes": true,
+  "next_required_steps": [
+    "Step 03B/04 threshold-weighted empirical accepted-fit screening",
+    "accepted-ensemble mechanism decomposition",
+    "held-out current/predictive validation"
+  ]
+}
