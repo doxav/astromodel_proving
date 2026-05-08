@@ -155,6 +155,8 @@ def normalize_flat_params(params: Mapping[str, Any]) -> Dict[str, Any]:
     for old, new in aliases.items():
         if old in p and new not in p:
             p[new] = p[old]
+        if old in p and old != new:
+            p.pop(old, None)
 
     p.setdefault("wo_middle", 1.0)
     p.setdefault("eps_middle", 1.0)
@@ -782,3 +784,5 @@ def simulate_with_hidden_outputs(
             sim["Vm_downsampled"] = vm_downsampled_norm
             sim["objective_recomputed"] = compute_loss(vm_downsampled_norm, exp_trace, loss_type=objective_loss_type)
     return sim
+
+########## FILE END: src/astro_model.py ##########

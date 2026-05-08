@@ -383,3 +383,5 @@ def select_mechanistically_diverse_representatives(
     if not selected_groups:
         return pd.DataFrame(columns=list(fits.columns) + ["representative_rank", "representative_group"])
     return pd.concat(selected_groups, ignore_index=True)
+
+########## FILE END: src/mechanisms.py ##########
