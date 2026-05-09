@@ -20,6 +20,8 @@ import pandas as pd
 from .astro_model import normalize_flat_params, simulate_with_hidden_outputs
 from .optuna_sqlite import TrialRecord, read_best_trial
 from .postfit_sqlite import d_pk_invariance_check, effective_parameters_from_flat
+from .parameter_space import coordinate_value as _shared_coordinate_value, set_coordinate as _shared_set_coordinate
+from .protocols import representative_context as _shared_representative_context, stim_window_seconds
 
 PRIMARY_EFFECTIVE_PARAMETERS = ["P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo"]
 DEFAULT_REPRESENTATIVE_DBS = ["CONTROL_75nA.db", "MFA_100nA.db", "BARIUM_100nA.db"]
@@ -79,18 +81,15 @@ def notebook_config_dict(config: Step03Config) -> dict[str, Any]:
 
 
 def _stim_window_seconds(condition: str) -> tuple[float, float]:
-    if condition.upper() == "CONTROL":
-        return (11.173, 31.173)
-    return (21.140, 41.140)
+    """Backward-compatible wrapper around :func:`protocols.stim_window_seconds`."""
+
+    return stim_window_seconds(condition)
 
 
 def representative_context(condition: str, current_na: int, n_timepoints: int = 180) -> dict[str, Any]:
-    _start, end = _stim_window_seconds(condition)
-    return {
-        "experiment_type": condition,
-        "current_na": int(current_na),
-        "sim_time_ms": np.linspace(0.0, (end + 5.0) * 1000.0, int(n_timepoints), dtype=float),
-    }
+    """Backward-compatible wrapper around :func:`protocols.representative_context`."""
+
+    return _shared_representative_context(condition, current_na, n_timepoints=n_timepoints)
 
 
 def build_effective_parameter_map(example_params: Mapping[str, Any] | None = None) -> pd.DataFrame:
@@ -160,31 +159,16 @@ def build_effective_parameter_map(example_params: Mapping[str, Any] | None = Non
 def set_parameter_coordinate(params: Mapping[str, Any], coordinate: str, value: float) -> dict[str, Any]:
     """Set a raw or effective coordinate while preserving current conventions."""
 
-    p = normalize_flat_params(params)
     value = float(value)
     if value <= 0 and coordinate in set(PRIMARY_EFFECTIVE_PARAMETERS + RAW_FIM_PARAMETERS):
         raise ValueError(f"{coordinate} must remain positive")
-    if coordinate == "P_gap_eff":
-        p["pk"] = value / max(float(p["d"]), 1e-30)
-    elif coordinate == "gamma_t_eff":
-        base = effective_parameters_from_flat(p, "CONTROL", 100)["gamma_t_eff"]
-        p["gt"] = float(p["gt"]) * value / max(base, 1e-30)
-    elif coordinate == "gamma_s_eff":
-        base = effective_parameters_from_flat(p, "CONTROL", 100)["gamma_s_eff"]
-        p["gs"] = float(p["gs"]) * value / max(base, 1e-30)
-    elif coordinate == "volume_ratio_wa_wo":
-        p["wo"] = float(p.get("w_a", 2000.0)) / value
-    else:
-        p[coordinate] = value
-    return p
+    return _shared_set_coordinate(params, coordinate, value)
 
 
 def coordinate_value(params: Mapping[str, Any], coordinate: str, condition: str, current_na: int) -> float:
-    p = normalize_flat_params(params)
-    if coordinate in PRIMARY_EFFECTIVE_PARAMETERS:
-        return float(effective_parameters_from_flat(p, condition, current_na)[coordinate])
-    return float(p[coordinate])
+    """Backward-compatible wrapper around :func:`parameter_space.coordinate_value`."""
 
+    return _shared_coordinate_value(params, coordinate, condition=condition, current_na=current_na)
 
 def observable_vector(params: Mapping[str, Any], condition: str, current_na: int, n_timepoints: int = 180, stride: int = 2) -> np.ndarray:
     sim = simulate_with_hidden_outputs(params, representative_context(condition, current_na, n_timepoints), solver="odeint")

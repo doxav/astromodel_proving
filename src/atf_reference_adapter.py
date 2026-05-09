@@ -58,9 +58,12 @@ def _select_reference_sources(nb) -> list[str]:
     for marker in REFERENCE_MATCHERS:
         match_source = None
         for cell in nb.cells:
-            if cell.cell_type == "code" and marker in cell.source:
-                match_source = cell.source
-                break
+            if cell.cell_type != "code" or marker not in cell.source:
+                continue
+            if marker == "from pathlib import Path" and "import numpy as np" not in cell.source:
+                continue
+            match_source = cell.source
+            break
         if match_source is None:
             raise RuntimeError(f"Could not find reference notebook cell for marker: {marker}")
         selected.append(_clean_cell5_source(match_source) if marker == "def running_in_colab" else match_source)

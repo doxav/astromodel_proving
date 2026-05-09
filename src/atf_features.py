@@ -1251,71 +1251,16 @@ def build_feature_table(cells: Any) -> Any:
     return pd.DataFrame(rows)
 
 def compute_feature_reliability(feature_table: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    feature_cols = FEATURE_COLUMNS
-    for (region, condition), sub in feature_table.groupby(["region", "condition"]):
-        n_rows = len(sub)
-        n_cells = sub["file_id"].nunique()
-        corr = sub[feature_cols].corr(method="spearman").abs().fillna(0.0)
-        for feature in feature_cols:
-            n_non_missing = int(sub[feature].notna().sum())
-            missing_rate = 1.0 - (n_non_missing / max(n_rows, 1))
-            redundancy = float(corr.loc[feature].drop(labels=[feature], errors="ignore").max())
-            redundant = feature in {"peak_depolarization_mV", "stim_end_depolarization_mV"}
-            small_stratum = bool(n_cells < 5)
-            weight = (1.0 - missing_rate)
-            if redundant:
-                weight *= 0.5
-            if small_stratum:
-                weight *= 0.8
-            rows.append(
-                {
-                    "region": region,
-                    "condition": condition,
-                    "feature": feature,
-                    "n_rows": n_rows,
-                    "n_cells": n_cells,
-                    "n_non_missing": n_non_missing,
-                    "missing_rate": missing_rate,
-                    "completeness": 1.0 - missing_rate,
-                    "max_abs_spearman": redundancy,
-                    "redundant_flag": redundant,
-                    "small_stratum": small_stratum,
-                    "reliability_weight": weight,
-                }
-            )
-    return pd.DataFrame(rows)
+    """Backward-compatible wrapper around shared feature-contract reliability."""
+
+    from .feature_contracts import compute_reliability_weights
+
+    return compute_reliability_weights(feature_table, FEATURE_COLUMNS)
 
 
 def build_threshold_table(feature_table: pd.DataFrame, reliability: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for (condition, region, sweep), sub in feature_table.groupby(["condition", "region", "sweep"]):
-        for feature in FEATURE_COLUMNS:
-            s = sub[feature].dropna()
-            if len(s) == 0:
-                continue
-            q1 = float(s.quantile(0.25))
-            q3 = float(s.quantile(0.75))
-            iqr = q3 - q1
-            rel = reliability[(reliability["condition"] == condition) & (reliability["region"] == region) & (reliability["feature"] == feature)]
-            weight = float(rel["reliability_weight"].iloc[0]) if not rel.empty else 1.0
-            rows.append(
-                {
-                    "condition": condition,
-                    "region": region,
-                    "sweep": int(sweep),
-                    "feature": feature,
-                    "n_total_rows": int(len(sub)),
-                    "n_non_missing": int(s.notna().sum()),
-                    "missing_rate": 1.0 - (len(s) / max(len(sub), 1)),
-                    "median": float(s.median()),
-                    "q1": q1,
-                    "q3": q3,
-                    "iqr": iqr,
-                    "acceptable_lower": q1 - 1.5 * iqr,
-                    "acceptable_upper": q3 + 1.5 * iqr,
-                    "threshold_scope": "region_specific",
-                    "reliability_weight": weight,
-                }
-            )
-    return pd.DataFrame(rows)
+    """Backward-compatible wrapper around shared feature-contract thresholds."""
+
+    from .feature_contracts import ThresholdScope, build_threshold_table as _build_threshold_table
+
+    return _build_threshold_table(feature_table, reliability, ThresholdScope("region_specific"), feature_columns=FEATURE_COLUMNS)

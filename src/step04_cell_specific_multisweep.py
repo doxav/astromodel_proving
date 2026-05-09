@@ -11,6 +11,9 @@ import pandas as pd
 
 from .astro_model import VALID_CURRENTS, simulate_voltage_trace
 from .atf_features import FEATURE_COLUMNS, build_feature_table, extract_features_from_trace
+from .contracts import protocol_condition
+from .feature_contracts import ThresholdScope, build_threshold_table as _shared_build_threshold_table, compute_reliability_weights as _shared_compute_reliability_weights, score_feature_contract
+from .trace_utils import baseline_center as _shared_baseline_center, downsample_trace, nrmse
 
 OUTPUT_SUBDIR = 'step04_cell_specific_multisweep'
 _CACHE: dict[tuple[str, str], object] = {}
@@ -103,92 +106,27 @@ def compute_effective_seed_summary(legacy_dir: Path) -> pd.DataFrame:
 
 
 def compute_reliability_weights(feature_df: pd.DataFrame) -> pd.DataFrame:
-    rows: list[dict[str, object]] = []
-    grouped = feature_df.groupby(['region', 'condition'])
-    for (region, condition), group in grouped:
-        n_cells = int(group['file_id'].nunique())
-        small_stratum = n_cells < 5
-        numeric = group[FEATURE_COLUMNS].copy()
-        corr = numeric.corr(method='spearman').abs().fillna(0.0)
-        for feature in FEATURE_COLUMNS:
-            n_non_missing = int(group[feature].notna().sum())
-            n_rows = int(len(group))
-            missing_rate = 1.0 - (n_non_missing / max(n_rows, 1))
-            others = corr.loc[feature].drop(labels=[feature], errors='ignore')
-            max_corr = float(others.max()) if len(others) else 0.0
-            redundant = max_corr > 0.98 and feature in {'peak_depolarization_mV', 'stim_end_depolarization_mV'}
-            weight = (1.0 - missing_rate)
-            if redundant:
-                weight *= 0.5
-            if small_stratum:
-                weight *= 0.8
-            rows.append(
-                {
-                    'region': region,
-                    'condition': condition,
-                    'feature': feature,
-                    'n_rows': n_rows,
-                    'n_cells': n_cells,
-                    'n_non_missing': n_non_missing,
-                    'missing_rate': missing_rate,
-                    'completeness': 1.0 - missing_rate,
-                    'max_abs_spearman': max_corr,
-                    'redundant_flag': redundant,
-                    'small_stratum': small_stratum,
-                    'reliability_weight': weight,
-                }
-            )
-    return pd.DataFrame(rows)
+    """Backward-compatible wrapper around shared feature reliability scoring."""
+
+    return _shared_compute_reliability_weights(feature_df, FEATURE_COLUMNS)
 
 
 def build_threshold_table(feature_df: pd.DataFrame, reliability_df: pd.DataFrame, exclude_file_id: str | None = None) -> pd.DataFrame:
-    df = feature_df.copy()
-    if exclude_file_id is not None:
-        df = df[df['file_id'] != exclude_file_id].copy()
-    rows: list[dict[str, object]] = []
-    for (condition, region, sweep), group in df.groupby(['condition', 'region', 'sweep']):
-        for feature in FEATURE_COLUMNS:
-            vals = pd.to_numeric(group[feature], errors='coerce').dropna()
-            if vals.empty:
-                continue
-            q1 = float(vals.quantile(0.25))
-            q3 = float(vals.quantile(0.75))
-            iqr = q3 - q1
-            rel_row = reliability_df[(reliability_df['condition'] == condition) & (reliability_df['region'] == region) & (reliability_df['feature'] == feature)]
-            weight = float(rel_row['reliability_weight'].iloc[0]) if not rel_row.empty else 1.0
-            rows.append(
-                {
-                    'condition': condition,
-                    'region': region,
-                    'sweep': int(sweep),
-                    'feature': feature,
-                    'n_total_rows': int(group['file_id'].nunique()),
-                    'n_non_missing': int(vals.notna().sum()),
-                    'missing_rate': 1.0 - float(vals.notna().mean()),
-                    'median': float(vals.median()),
-                    'q1': q1,
-                    'q3': q3,
-                    'iqr': iqr,
-                    'acceptable_lower': q1 - 1.5 * iqr,
-                    'acceptable_upper': q3 + 1.5 * iqr,
-                    'threshold_scope': 'leave_one_cell_out_region_specific' if exclude_file_id else 'region_specific',
-                    'reliability_weight': weight,
-                }
-            )
-    return pd.DataFrame(rows)
+    """Backward-compatible wrapper around shared threshold construction."""
 
+    scope = ThresholdScope("leave_one_cell_out", exclude_file_id=exclude_file_id) if exclude_file_id is not None else ThresholdScope("region_specific")
+    return _shared_build_threshold_table(feature_df, reliability_df, scope, feature_columns=FEATURE_COLUMNS)
 
 def _baseline_center(t_s: np.ndarray, v_mV: np.ndarray, onset_s: float) -> np.ndarray:
-    mask = (t_s >= max(t_s[0], onset_s - 5.0)) & (t_s < max(t_s[0], onset_s - 1.0))
-    if not np.any(mask):
-        mask = t_s < onset_s
-    baseline = float(np.median(v_mV[mask]))
-    return np.asarray(v_mV, dtype=float) - baseline
+    """Backward-compatible wrapper around :func:`trace_utils.baseline_center`."""
+
+    return _shared_baseline_center(t_s, v_mV, onset_s)
 
 
 def _downsample_to_common_grid(t_s: np.ndarray, v_mV: np.ndarray, n_points: int) -> tuple[np.ndarray, np.ndarray]:
-    grid = np.linspace(float(t_s[0]), float(t_s[-1]), int(n_points))
-    return grid, np.interp(grid, np.asarray(t_s, dtype=float), np.asarray(v_mV, dtype=float))
+    """Backward-compatible wrapper around :func:`trace_utils.downsample_trace`."""
+
+    return downsample_trace(t_s, v_mV, n_points, preserve_short=False)
 
 
 def _distance_to_interval(value: float, low: float, high: float) -> float:
@@ -207,8 +145,9 @@ def _make_condition_seed_map(seed_summary: pd.DataFrame) -> dict[str, dict[str, 
 
 
 def _canonical_condition(condition: str) -> str:
-    cond = str(condition).upper()
-    return 'BARIUM' if cond == 'MFA_BA' else cond
+    """Backward-compatible wrapper returning the simulation protocol condition."""
+
+    return protocol_condition(condition)
 
 def select_cells_for_run(cells: Iterable[Mapping[str, object]], max_cells: int | None, mode: str = 'ordered') -> list[Mapping[str, object]]:
     ordered = sorted(
@@ -320,27 +259,32 @@ def score_candidate_for_cell(
             sim_centered = _baseline_center(obs_grid, sim_v, onset_s)
             pred_feat = extract_features_from_trace(obs_grid, sim_v, onset_s=onset_s, offset_s=offset_s)
             predicted_peaks.append(float(pred_feat['peak_depolarization_mV']))
-            trace_nrmse = float(np.sqrt(np.mean((sim_centered - obs_centered) ** 2)) / max(np.max(np.abs(obs_centered)), 1.0))
-            threshold_rows = threshold_df[(threshold_df['condition'] == meta['condition']) & (threshold_df['region'] == meta['region']) & (threshold_df['sweep'] == sweep_idx)]
+            trace_nrmse = nrmse(sim_centered, obs_centered, denominator=max(float(np.nanmax(np.abs(obs_centered))), 1.0))
+            feature_score = score_feature_contract(
+                pred_feat,
+                threshold_df,
+                condition=str(meta['condition']),
+                region=str(meta['region']),
+                sweep=sweep_idx,
+                feature_columns=FEATURE_COLUMNS,
+            )
+            weighted_pass_fraction = float(feature_score['weighted_pass_fraction'])
+            weighted_feature_penalty = float(feature_score['weighted_feature_penalty'])
             pass_weights = []
-            penalties = []
-            total_w = 0.0
-            total_pass = 0.0
             for feature in FEATURE_COLUMNS:
-                thr = threshold_rows[threshold_rows['feature'] == feature]
+                thr = threshold_df[
+                    (threshold_df['condition'] == meta['condition'])
+                    & (threshold_df['region'] == meta['region'])
+                    & (threshold_df['sweep'] == sweep_idx)
+                    & (threshold_df['feature'] == feature)
+                ]
                 if thr.empty:
                     continue
                 thr_row = thr.iloc[0]
-                weight = float(thr_row['reliability_weight'])
                 value = float(pred_feat.get(feature, np.nan))
-                within = bool(thr_row['acceptable_lower'] <= value <= thr_row['acceptable_upper']) if np.isfinite(value) else False
+                within = bool(feature_score.get(f'pass_{feature}', False))
                 dist = _distance_to_interval(value, float(thr_row['acceptable_lower']), float(thr_row['acceptable_upper']))
-                total_w += weight
-                total_pass += weight * float(within)
-                pass_weights.append((feature, within, weight, dist, value))
-                penalties.append(weight * dist)
-            weighted_pass_fraction = total_pass / total_w if total_w > 0 else 0.0
-            weighted_feature_penalty = float(sum(penalties) / total_w) if total_w > 0 else 1.0
+                pass_weights.append((feature, within, float(thr_row['reliability_weight']), dist, value))
             sweep_rows.append(
                 {
                     'file_id': meta['file_id'],
