@@ -60,12 +60,3 @@ If two features are near-duplicates (for example `peak_depolarization_mV` and `s
 
 ### 7. Step-appropriate benchmarks only
 Do not benchmark Numba-vs-NumPy in step 02. Performance benchmarking belongs in optimization-heavy steps where repeated simulation cost matters.
-
-## Current Pareto conclusions from steps 00-02
-
-- Removing `CONTROL_TRACES_old.csv` is correct.
-- That removal does **not** verify the historical control DB objectives.
-- Therefore:
-  - step 00 should emphasize **legacy-vs-ATF separation**, not a false control-source resolution;
-  - step 01 remains a **legacy single-current diagnostic** step;
-  - step 02 is the main reviewer-facing gain for now because it rebuilds thresholds from the 37 ATF files with DH/VH structure preserved.
