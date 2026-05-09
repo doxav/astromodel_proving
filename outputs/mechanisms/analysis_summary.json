@@ -11,12 +11,19 @@
     "max_representatives": 3,
     "interpolation_points": 5,
     "small_stratum_min_cells": 3,
+    "min_candidates_for_multicluster": 6,
+    "min_cells_for_multicluster": 3,
+    "min_cells_per_cluster": 2,
+    "proxy_failure_downgrade_fraction": 0.5,
     "write_outputs": true
   },
   "n_input_candidates": 4,
   "n_candidate_sweep_rows": 24,
   "n_successful_sweep_simulations": 24,
-  "n_mechanism_clusters": 3,
-  "headline_claim_scope": "candidate_mechanism_regimes_pending_validation",
-  "elapsed_seconds": 2.2951793430002
+  "n_mechanism_clusters": 1,
+  "n_independent_cells": 2,
+  "cluster_evidence_status": "insufficient_evidence",
+  "cluster_evidence_reason": "needs >= 6 candidates and >= 3 independent cells; observed 4 candidates and 2 cells",
+  "headline_claim_scope": "insufficient_evidence_for_candidate_mechanism_regimes",
+  "elapsed_seconds": 2.9885184410013608
 }
