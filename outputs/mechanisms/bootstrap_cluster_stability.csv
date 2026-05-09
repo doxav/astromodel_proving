@@ -1,9 +1,2 @@
-bootstrap_iteration,n_cells,n_candidates,coassignment_stability,stability_status
-1,1,2,1.0,stable
-2,1,2,1.0,stable
-3,2,4,1.0,stable
-4,2,4,1.0,stable
-5,1,6,1.0,stable
-6,1,2,1.0,stable
-7,1,2,1.0,stable
-8,2,4,1.0,stable
+bootstrap_iteration,n_cells,n_candidates,coassignment_stability,stability_status,stability_reason
+0,2,4,,insufficient_evidence,needs >= 6 candidates and >= 3 independent cells; observed 4 candidates and 2 cells
