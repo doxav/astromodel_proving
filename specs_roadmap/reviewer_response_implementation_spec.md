@@ -622,7 +622,7 @@ The notebook must show:
 
 **Pareto rank:** 5. Converts cell-specific accepted ensembles into mechanism-level evidence. This is the primary step for R5 and the first step where candidate mechanism regimes may be assessed. These regimes remain candidate regimes until Step 06 predictive and perturbation checks support them.
 
-**Primary output:** `outputs/mechanisms/accepted_fit_mechanisms.csv`, `outputs/mechanisms/mechanism_clusters.csv`, `outputs/mechanisms/representatives.csv`, `outputs/mechanisms/region_mechanism_enrichment.csv`, `outputs/mechanisms/geometry_classification.csv`.
+**Primary output:** `outputs/mechanisms/accepted_fit_mechanisms.csv`, `outputs/mechanisms/mechanism_clusters.csv`, `outputs/mechanisms/representatives.csv`, `outputs/mechanisms/region_mechanism_enrichment.csv`, `outputs/mechanisms/geometry_classification.csv`, `outputs/mechanisms/bootstrap_cluster_stability.csv`, `outputs/mechanisms/claim_scope_table.csv`, and `outputs/mechanisms/analysis_summary.json`.
 
 ### Scientific objectives
 

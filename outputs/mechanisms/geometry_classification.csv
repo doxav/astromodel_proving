@@ -1,0 +1,4 @@
+cluster_a,cluster_b,n_interpolation_points,interpolation_status,geometry_classification,validation_status
+M1,M2,5,effective_space_screened,separated_modes_pending_validation,pending_step06
+M1,M3,5,effective_space_screened,compensation_manifold,pending_step06
+M2,M3,5,effective_space_screened,separated_modes_pending_validation,pending_step06
