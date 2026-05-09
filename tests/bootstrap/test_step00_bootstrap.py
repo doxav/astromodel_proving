@@ -42,8 +42,12 @@ def test_step00_trace_summary_is_machine_readable(initial_fit_dir: Path) -> None
         "MFA_TRACES.csv",
         "BARIUM_TRACES.csv",
     }
-    assert (summary["rows"] > 10).all()
-    assert (summary["n_columns"] >= 2).all()
+    present = summary[summary["provenance_status"] == "present"]
+    assert (present["rows"] > 10).all()
+    assert (present["n_columns"] >= 2).all()
+    removed = summary[summary["trace_source"] == "CONTROL_TRACES_old.csv"].iloc[0]
+    assert bool(removed["exists"]) is False
+    assert removed["provenance_status"] == "removed_not_used"
 
 
 def test_step00_sqlite_reader_can_load_representative_best_trial(initial_fit_dir: Path) -> None:

@@ -93,13 +93,36 @@ def load_step02_outputs_or_run(project_root: Path, reuse_existing: bool = True) 
     counts_csv = paths["features_dir"] / "region_condition_cell_counts.csv"
     reliability_csv = paths["features_dir"] / "feature_reliability_weights.csv"
     if reuse_existing and feature_csv.exists() and threshold_csv.exists() and counts_csv.exists():
+        compatibility_actions: list[str] = []
+        feature_df = pd.read_csv(feature_csv)
+        thresholds_df = pd.read_csv(threshold_csv)
+        counts_df = pd.read_csv(counts_csv)
+        if {"file_id", "condition"}.issubset(feature_df.columns):
+            control_mask = feature_df["condition"].eq("CONTROL") & ~feature_df["file_id"].astype(str).str.upper().str.endswith("_CONTROL")
+            feature_df.loc[control_mask, "file_id"] = feature_df.loc[control_mask, "file_id"].astype(str) + "_CONTROL"
+            if bool(control_mask.any()):
+                compatibility_actions.append("appended_CONTROL_suffix_to_cached_control_file_ids")
+        if "stim_end_depolarization_mV" not in feature_df.columns:
+            if "plateau_level_mV" in feature_df.columns and "baseline_mV" in feature_df.columns:
+                feature_df["stim_end_depolarization_mV"] = pd.to_numeric(feature_df["plateau_level_mV"], errors="coerce") - pd.to_numeric(feature_df["baseline_mV"], errors="coerce")
+            else:
+                feature_df["stim_end_depolarization_mV"] = feature_df.get("peak_depolarization_mV", np.nan)
+            compatibility_actions.append("derived_missing_stim_end_depolarization_mV")
+        needed_features = set(FEATURE_COLUMNS)
+        if "feature" not in thresholds_df.columns or not needed_features.issubset(set(thresholds_df["feature"].dropna().astype(str))):
+            reliability_df = compute_feature_reliability(feature_df)
+            thresholds_df = build_threshold_table(feature_df, reliability_df)
+            compatibility_actions.append("rebuilt_thresholds_due_to_stale_feature_contract")
         out = {
-            "feature_table_by_sweep": pd.read_csv(feature_csv),
-            "condition_region_sweep_thresholds": pd.read_csv(threshold_csv),
-            "region_condition_cell_counts": pd.read_csv(counts_csv),
+            "feature_table_by_sweep": feature_df,
+            "condition_region_sweep_thresholds": thresholds_df,
+            "region_condition_cell_counts": counts_df,
         }
         if reliability_csv.exists():
             out["feature_reliability_weights"] = pd.read_csv(reliability_csv)
+        out["compatibility_actions"] = pd.DataFrame(
+            [{"action": a, "source": "cached_step02"} for a in compatibility_actions]
+        )
         return out
     cells = load_all_cells(paths["atf_dir"])
     feature_df = build_feature_table(cells)
@@ -660,8 +683,27 @@ def run_step04_cell_specific_six_sweep_fitting(project_root: str | Path, output_
     cfg = Step04Config(project_root=Path(project_root).resolve(), output_dir=(Path(output_dir) if output_dir is not None else None), max_cells=max_cells, selected_file_ids=list(selected_file_ids) if selected_file_ids else None, n_fit_points=n_fit_points, n_starts=n_starts, max_nfev_all6=max_nfev_all6, max_nfev_holdout=max_nfev_holdout, trace_rmse_accept=trace_rmse_accept, feature_pass_accept=feature_pass_accept, heldout_trace_rmse_accept=heldout_trace_rmse_accept, heldout_pass_accept=heldout_pass_accept, heldout_min_pass_count=heldout_min_pass_count, accepted_top_k_per_cell=accepted_top_k_per_cell).resolve()
     paths = _project_paths(cfg.project_root)
     step02 = load_step02_outputs_or_run(cfg.project_root, reuse_existing=reuse_step02_outputs)
-    feature_df = step02["feature_table_by_sweep"]
-    thresholds_df = step02["condition_region_sweep_thresholds"]
+    feature_df = step02["feature_table_by_sweep"].copy()
+    # Step 02 historical outputs use bare control file ids (for example
+    # ``1_DH_1``), whereas the Step 04 ATF loader canonicalizes controls with
+    # an explicit ``_CONTROL`` suffix.  Duplicate those rows under the explicit
+    # id so Step 04 can reuse existing Step 02 CSVs instead of regenerating a
+    # second, incompatible feature table.
+    if "stim_end_depolarization_mV" not in feature_df.columns:
+        if "plateau_level_mV" in feature_df.columns and "baseline_mV" in feature_df.columns:
+            feature_df["stim_end_depolarization_mV"] = pd.to_numeric(feature_df["plateau_level_mV"], errors="coerce") - pd.to_numeric(feature_df["baseline_mV"], errors="coerce")
+        else:
+            feature_df["stim_end_depolarization_mV"] = feature_df.get("peak_depolarization_mV", np.nan)
+    if {"file_id", "condition"}.issubset(feature_df.columns):
+        control_mask = (feature_df["condition"].astype(str).str.upper() == "CONTROL") & (~feature_df["file_id"].astype(str).str.upper().str.endswith("_CONTROL"))
+        if control_mask.any():
+            control_aliases = feature_df.loc[control_mask].copy()
+            control_aliases["file_id"] = control_aliases["file_id"].astype(str) + "_CONTROL"
+            feature_df = pd.concat([feature_df, control_aliases], ignore_index=True)
+    thresholds_df = step02["condition_region_sweep_thresholds"].copy()
+    if "feature" in thresholds_df.columns and not set(FEATURE_COLUMNS).issubset(set(thresholds_df["feature"].astype(str))):
+        reliability_df = compute_feature_reliability(feature_df)
+        thresholds_df = build_threshold_table(feature_df, reliability_df)
     cell_counts_df = step02["region_condition_cell_counts"]
 
     if cfg.selected_file_ids is not None:

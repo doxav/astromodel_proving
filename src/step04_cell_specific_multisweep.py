@@ -459,8 +459,10 @@ def fit_cell(
     accepted_ids = set(int(x) for x in accepted_df['candidate_id'])
     sweep_df = pd.DataFrame(sweep_rows)
     trace_df = pd.DataFrame(trace_rows)
-    sweep_df = sweep_df[sweep_df['candidate_id'].isin(accepted_ids)].copy()
-    trace_df = trace_df[trace_df['candidate_id'].isin(accepted_ids)].copy()
+    if 'candidate_id' in sweep_df.columns:
+        sweep_df = sweep_df[sweep_df['candidate_id'].isin(accepted_ids)].copy()
+    if 'candidate_id' in trace_df.columns:
+        trace_df = trace_df[trace_df['candidate_id'].isin(accepted_ids)].copy()
     return accepted_df, sweep_df, trace_df
 
 
