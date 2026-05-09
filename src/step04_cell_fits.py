@@ -13,6 +13,10 @@ from scipy.optimize import least_squares
 from .astro_model import DEFAULT_Z0, simulate_odeint
 from .atf_io import load_all_cells, load_cell_protocol, canonical_file_id
 from .atf_features import FEATURE_COLUMNS, build_feature_table, compute_feature_reliability, build_threshold_table, extract_features_from_trace
+from .feature_contracts import feature_residual_vector, score_feature_contract
+from .parameter_space import effective_from_flat, flat_from_effective
+from .protocols import default_onset_seconds
+from .trace_utils import baseline_center, downsample_trace
 
 TRACE_SCALE_MV_DEFAULT = 10.0
 TRACE_RMSE_ACCEPT_DEFAULT = 18.0
@@ -149,10 +153,9 @@ def load_step02_outputs_or_run(project_root: Path, reuse_existing: bool = True) 
 
 
 def _safe_downsample_trace(time_s: np.ndarray, vm: np.ndarray, n_points: int) -> tuple[np.ndarray, np.ndarray]:
-    if len(time_s) <= n_points:
-        return time_s * 1000.0, vm
-    target_time_s = np.linspace(float(time_s[0]), float(time_s[-1]), int(n_points), dtype=float)
-    target_vm = np.interp(target_time_s, time_s, vm)
+    """Backward-compatible wrapper that returns Step 04 fit times in ms."""
+
+    target_time_s, target_vm = downsample_trace(time_s, vm, n_points)
     return target_time_s * 1000.0, target_vm
 
 
@@ -189,13 +192,9 @@ def heldout_splits(n_sweeps: int = 6) -> list[tuple[list[int], int]]:
 
 
 def _baseline_subtract(trace: np.ndarray, time_ms: np.ndarray, onset_s: float) -> np.ndarray:
-    t_s = np.asarray(time_ms, dtype=float) / 1000.0
-    mask = (t_s >= max(0.0, onset_s - 5.0)) & (t_s <= max(0.5, onset_s - 1.0))
-    if mask.any():
-        baseline = float(np.nanmedian(trace[mask]))
-    else:
-        baseline = float(np.nanmedian(trace[: max(5, min(50, len(trace)))]))
-    return np.asarray(trace, dtype=float) - baseline
+    """Backward-compatible wrapper around :func:`trace_utils.baseline_center`."""
+
+    return baseline_center(np.asarray(time_ms, dtype=float) / 1000.0, trace, onset_s, include_endpoint=True)
 
 
 def _threshold_row(thresholds_df: pd.DataFrame, region: str, condition: str, sweep: int, feature: str) -> pd.Series:
@@ -206,64 +205,34 @@ def _threshold_row(thresholds_df: pd.DataFrame, region: str, condition: str, swe
 
 
 def _feature_contract_score(sim_features: Mapping[str, Any], empirical_row: Mapping[str, Any], thresholds_df: pd.DataFrame, region: str, condition: str, sweep: int) -> dict[str, Any]:
-    total_weight = 0.0
-    soft_score_sum = 0.0
-    weighted_distance = 0.0
-    feature_passes: dict[str, bool] = {}
-    for feature in FEATURE_COLUMNS:
-        th = _threshold_row(thresholds_df, region, condition, sweep, feature)
-        weight = float(th.get("reliability_weight", 1.0))
-        if weight <= 0:
-            continue
-        total_weight += weight
-        val = sim_features.get(feature, np.nan)
-        lower = float(th["acceptable_lower"])
-        upper = float(th["acceptable_upper"])
-        iqr = float(th["iqr"]) if np.isfinite(th["iqr"]) and abs(float(th["iqr"])) > 1e-12 else max(abs(float(th["median"])) * 0.25, 0.5)
-        passed = bool(np.isfinite(val) and val >= lower and val <= upper)
-        feature_passes[f"pass_{feature}"] = passed
-        if np.isfinite(val):
-            distance = 0.0
-            if val < lower:
-                distance = lower - val
-            elif val > upper:
-                distance = val - upper
-            soft_score = max(0.0, 1.0 - distance / max(2.0 * abs(iqr), 1e-9))
-            soft_score_sum += weight * soft_score
-            weighted_distance += weight * (1.0 - soft_score)
-        else:
-            weighted_distance += weight
-    weighted_pass_fraction = soft_score_sum / max(total_weight, 1e-12)
-    feature_loss = weighted_distance / max(total_weight, 1e-12)
-    plateau_match = float(bool(sim_features.get("plateau_reached", False)) == bool(empirical_row.get("plateau_reached", False)))
-    undershoot_match = float(bool(sim_features.get("has_undershoot", False)) == bool(empirical_row.get("has_undershoot", False)))
-    binary_penalty = 0.5 * ((1.0 - plateau_match) + (1.0 - undershoot_match))
-    return {
-        "weighted_pass_fraction": float(weighted_pass_fraction),
-        "feature_loss": float(feature_loss),
-        "binary_penalty": float(binary_penalty),
-        **feature_passes,
-    }
+    """Backward-compatible wrapper around :func:`feature_contracts.score_feature_contract`."""
+
+    score = score_feature_contract(
+        sim_features,
+        thresholds_df,
+        condition=condition,
+        region=region,
+        sweep=sweep,
+        empirical=empirical_row,
+        feature_columns=FEATURE_COLUMNS,
+        pass_fraction_mode="soft",
+    )
+    return score
 
 
 def _feature_residuals(sim_features: Mapping[str, Any], empirical_row: Mapping[str, Any], thresholds_df: pd.DataFrame, region: str, condition: str, sweep: int) -> np.ndarray:
-    residuals: list[float] = []
-    for feature in FEATURE_COLUMNS:
-        th = _threshold_row(thresholds_df, region, condition, sweep, feature)
-        weight = float(th.get("reliability_weight", 1.0))
-        if weight <= 0:
-            continue
-        emp = empirical_row.get(feature, np.nan)
-        sim = sim_features.get(feature, np.nan)
-        width = float(th.get("iqr", np.nan))
-        if not np.isfinite(width) or abs(width) < 1e-12:
-            width = abs(float(th.get("acceptable_upper", 1.0)) - float(th.get("acceptable_lower", 0.0))) / 2.0
-        if not np.isfinite(width) or abs(width) < 1e-12:
-            width = max(abs(float(th.get("median", 1.0))) * 0.25, 0.5)
-        if np.isfinite(emp) and np.isfinite(sim):
-            residuals.append(math.sqrt(weight) * (float(sim) - float(emp)) / max(abs(width), 1e-9))
-        else:
-            residuals.append(math.sqrt(weight) * 3.0)
+    """Backward-compatible wrapper around :func:`feature_contracts.feature_residual_vector`."""
+
+    feature_resid = feature_residual_vector(
+        sim_features,
+        empirical_row,
+        thresholds_df,
+        condition=condition,
+        region=region,
+        sweep=sweep,
+        feature_columns=FEATURE_COLUMNS,
+    )
+    residuals = feature_resid.tolist()
     plateau_emp = bool(empirical_row.get("plateau_reached", False))
     plateau_sim = bool(sim_features.get("plateau_reached", False))
     residuals.append(0.5 if plateau_emp != plateau_sim else 0.0)
@@ -272,39 +241,22 @@ def _feature_residuals(sim_features: Mapping[str, Any], empirical_row: Mapping[s
     residuals.append(0.5 if undershoot_emp != undershoot_sim else 0.0)
     return np.asarray(residuals, dtype=float)
 
-
 def _default_onset_s(condition: str) -> float:
-    return 11.173 if str(condition).upper() == "CONTROL" else 21.140
+    """Backward-compatible wrapper around :func:`protocols.default_onset_seconds`."""
+
+    return default_onset_seconds(condition)
 
 
 def _effective_from_flat(params: Mapping[str, Any]) -> dict[str, float]:
-    w_a = float(params.get("w_a", 2000.0))
-    sig_a = 1600.0
-    F = 96485.0
-    d = float(params.get("d", 1.0))
-    pk = float(params.get("pk", 0.0))
-    return {
-        "P_gap_eff": d * pk,
-        "gamma_t_eff": float(params.get("gt", 0.0)) * sig_a / (w_a * F),
-        "gamma_s_eff": float(params.get("gs", 0.0)) * sig_a / (w_a * F),
-        "volume_ratio_wa_wo": w_a / max(float(params.get("wo", 1500.0)), 1e-12),
-    }
+    """Backward-compatible wrapper around :func:`parameter_space.effective_from_flat`."""
+
+    return effective_from_flat(params).as_dict()
 
 
 def _flat_from_effective(condition: str, eff: Mapping[str, float], extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    base = dict(BASE_CONDITION_DEFAULTS[condition])
-    w_a = float(base["w_a"])
-    sig_a = 1600.0
-    F = 96485.0
-    out = dict(base)
-    out["d"] = 1.0
-    out["pk"] = float(eff["P_gap_eff"])
-    out["gt"] = float(eff["gamma_t_eff"]) * w_a * F / sig_a
-    out["gs"] = float(eff["gamma_s_eff"]) * w_a * F / sig_a
-    out["wo"] = w_a / max(float(eff["volume_ratio_wa_wo"]), 1e-12)
-    if extra:
-        out.update(extra)
-    return out
+    """Backward-compatible wrapper around :func:`parameter_space.flat_from_effective`."""
+
+    return flat_from_effective(condition, eff, extra=extra)
 
 
 def _default_effective_by_condition(project_root: Path, condition: str) -> tuple[dict[str, float], str]:

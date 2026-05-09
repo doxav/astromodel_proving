@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 
 from .astro_model import build_paramdict, compute_rhs_and_currents, normalize_flat_params, simulate_with_hidden_outputs
+from .parameter_space import effective_from_flat
+from .protocols import representative_context as _shared_representative_context, stim_window_seconds
 from .mechanisms import compute_flux_summary, compute_proxy_validity
 from .optuna_sqlite import TrialRecord, read_best_trial, read_top_trials
 
@@ -31,18 +33,9 @@ class InvarianceCheck:
 
 
 def effective_parameters_from_flat(flat_params: Mapping[str, Any], experiment_type: str, current_na: int) -> dict[str, float]:
-    paramdict = build_paramdict(experiment_type, current_na, flat_params)
-    astro = paramdict["Astrocyte"]
-    external = paramdict["external"]
-    w_a = float(astro["w_a"])
-    sig_a = float(astro["Sig_a"])
-    F = float(astro["F"])
-    return {
-        "P_gap_eff": float(astro["d_gap"] * astro["P_k"]),
-        "gamma_t_eff": float(astro["gama_t"] * sig_a / (w_a * F)),
-        "gamma_s_eff": float(astro["gama_s"] * sig_a / (w_a * F)),
-        "volume_ratio_wa_wo": float(w_a / float(external["w_o"])),
-    }
+    """Backward-compatible wrapper around :func:`parameter_space.effective_from_flat`."""
+
+    return effective_from_flat(flat_params, condition=experiment_type, current_na=current_na).as_dict()
 
 
 def d_pk_invariance_check(
@@ -75,19 +68,15 @@ def d_pk_invariance_check(
 
 
 def _stim_window_seconds(condition: str) -> tuple[float, float]:
-    if condition.upper() == "CONTROL":
-        return (11.173, 31.173)
-    return (21.140, 41.140)
+    """Backward-compatible wrapper around :func:`protocols.stim_window_seconds`."""
+
+    return stim_window_seconds(condition)
 
 
 def _representative_context(condition: str, current_na: int, n_timepoints: int = 600) -> dict[str, Any]:
-    start, end = _stim_window_seconds(condition)
-    t_final_ms = (end + 5.0) * 1000.0
-    return {
-        "experiment_type": condition,
-        "current_na": current_na,
-        "sim_time_ms": np.linspace(0.0, t_final_ms, int(n_timepoints), dtype=float),
-    }
+    """Backward-compatible wrapper around :func:`protocols.representative_context`."""
+
+    return _shared_representative_context(condition, current_na, n_timepoints=n_timepoints)
 
 
 def summarize_representative_trial(record: TrialRecord, n_timepoints: int = 600) -> tuple[dict[str, Any], dict[str, Any]]:
