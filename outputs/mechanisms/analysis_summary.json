@@ -1,0 +1,22 @@
+{
+  "step_name": "Step 05 \u2014 Mechanistic decomposition of accepted cell ensembles",
+  "input_source": "outputs/cell_fits/accepted_cell_ensembles.csv",
+  "config": {
+    "max_candidates": 4,
+    "time_points": 120,
+    "t_final_ms": 50000.0,
+    "n_clusters": 3,
+    "bootstrap_iterations": 8,
+    "random_seed": 13,
+    "max_representatives": 3,
+    "interpolation_points": 5,
+    "small_stratum_min_cells": 3,
+    "write_outputs": true
+  },
+  "n_input_candidates": 4,
+  "n_candidate_sweep_rows": 24,
+  "n_successful_sweep_simulations": 24,
+  "n_mechanism_clusters": 3,
+  "headline_claim_scope": "candidate_mechanism_regimes_pending_validation",
+  "elapsed_seconds": 2.2951793430002
+}
