@@ -1,0 +1,10 @@
+parameter,coordinate_type,lower_bound,upper_bound,range_source,range_basis
+gki,raw,1.0,300.0,broad_model_guardrail,Kir conductance kept within broad positive astrocyte-model scale
+eps,raw,1e-05,0.2,broad_model_guardrail,extracellular exchange factor must be positive and sub-unity
+gl_a,raw,0.0001,50.0,broad_model_guardrail,leak conductance kept positive and below dominant Kir scale
+zth,raw,0.001,5.0,broad_model_guardrail,gating threshold kept positive on modeled potassium-deviation scale
+zs,raw,0.0001,5.0,broad_model_guardrail,gating slope/scale kept positive on modeled potassium-deviation scale
+P_gap_eff,effective,1e-08,0.005,effective_coordinate_guardrail,interpretable product d × pk for gap coupling
+gamma_t_eff,effective,1e-08,0.05,effective_coordinate_guardrail,transport effective coordinate normalized by volume/Faraday terms
+gamma_s_eff,effective,1e-08,0.05,effective_coordinate_guardrail,syncytial effective coordinate normalized by volume/Faraday terms
+volume_ratio_wa_wo,effective,0.001,1000.0,effective_coordinate_guardrail,cell/extracellular volume ratio effective coordinate

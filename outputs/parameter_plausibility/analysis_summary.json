@@ -1,0 +1,40 @@
+{
+  "step": "08_parameter_plausibility_and_constrained_reruns",
+  "config": {
+    "max_candidates": 3,
+    "constrained_max_candidates": 3,
+    "time_points": 40,
+    "t_final_ms": 50000.0,
+    "currents_na": [
+      50,
+      75,
+      100,
+      125,
+      150,
+      175
+    ],
+    "min_holdout_pass_fraction": 0.3,
+    "max_trace_rmse_mV": 25.0,
+    "boundary_fraction": 0.05,
+    "acceptable_fit_degradation_fraction": 0.15,
+    "mechanism_flux_fraction_delta_max": 0.2,
+    "changed_fit_degradation_warn_mV": 5.0,
+    "write_outputs": true
+  },
+  "n_candidates": 3,
+  "n_parameter_rows": 27,
+  "n_effective_rows": 12,
+  "n_out_of_range_rows": 0,
+  "n_phys_interpretable_rows": 9,
+  "n_constrained_rerun_rows": 18,
+  "currents_na": [
+    50,
+    75,
+    100,
+    125,
+    150,
+    175
+  ],
+  "final_degeneracy_claim_allowed_after_step08": false,
+  "claim_scope": "Step 08 supports parameter-interpretability guardrails, but final biological degeneracy claims remain disabled until Step 09 synthesis."
+}
