@@ -102,7 +102,12 @@ def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[
     ensemble, _ = load_step04_accepted_ensemble(project_root, max_candidates=config.max_candidates)
     mechanisms = load_mechanism_labels(project_root, max_candidates=None)
     keep_cols = [c for c in mechanisms.columns if c in set(IDENTITY_COLUMNS + ["mechanism_cluster", "dominant_mechanism", "cluster_evidence_status", "cluster_claim_scope"])]
-    merged = ensemble.merge(mechanisms[keep_cols].drop_duplicates(IDENTITY_COLUMNS), on=IDENTITY_COLUMNS, how="left")
+    merged = ensemble.merge(
+        mechanisms[keep_cols].drop_duplicates(IDENTITY_COLUMNS),
+        on=IDENTITY_COLUMNS,
+        how="left",
+        validate="many_to_one",
+    )
     merged["mechanism_cluster"] = merged["mechanism_cluster"].fillna("unlabeled")
     merged["dominant_mechanism"] = merged.get("dominant_mechanism", pd.Series(index=merged.index, dtype=object)).fillna("unknown")
     merged["cluster_evidence_status"] = merged.get("cluster_evidence_status", pd.Series(index=merged.index, dtype=object)).fillna("insufficient_evidence")
@@ -455,8 +460,8 @@ def build_robustness_summary(
             and validation_label == "predictive_supported"
         )
         claim_scope_after_step06 = (
-            f"{step06_screen_claim}; Step 06 is only a screen and biological degeneracy wording remains "
-            "unavailable until assumption-sensitivity and parameter-plausibility checks pass"
+            f"{step06_screen_claim}; final biological degeneracy wording remains disallowed "
+            "until assumption-sensitivity and parameter-plausibility checks pass"
         )
         rows.append(
             {
