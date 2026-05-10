@@ -1,0 +1,3 @@
+file_id,region,condition,candidate_id,mechanism_cluster,current_na,sweep,two_state_proxy_abs_corr,one_state_proxy_abs_corr,corr_delta_one_minus_two,split_sensitivity_status,mechanism_structure_persists,simulation_status,failure_reason
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,100,3,0.18916080842058297,0.1884565089857797,-0.0007042994348032683,split_robust,True,ok,
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,100,3,0.1872463509933779,0.18868356087899374,0.0014372098856158255,split_robust,True,ok,

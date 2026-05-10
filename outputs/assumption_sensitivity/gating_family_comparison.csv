@@ -1,0 +1,13 @@
+file_id,region,condition,candidate_id,current_na,sweep,gating_family,identical_contract_id,mechanism_cluster,dominant_mechanism,holdout_pass_fraction,mean_trace_rmse_mV_step04,simulation_status,failure_reason,trace_rmse_vs_sigmoid_mV,family_supported_under_same_contract,mechanism_claim_stable
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.0,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,tanh,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.010596828512941574,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,hill,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.023136040008937438,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,soft_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.02293916037761131,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,hard_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.023160748656076126,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,100,3,double_sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,3.815293666815682,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.0,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,tanh,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.009673834042419274,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,hill,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.021289105613743663,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,soft_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.021104728508467212,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,hard_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,0.021313818545204203,True,True
+1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,100,3,double_sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3402183306339089,12.419386960237825,ok,,3.2749217859032225,True,True

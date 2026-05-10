@@ -172,6 +172,14 @@ def _switching_gate(dk_a: float, dk_a_t: float, astro: Mapping[str, Any]) -> flo
     if switching_function in {"soft_threshold", "soft-threshold", "linear_threshold"}:
         activation = max(0.0, dk_a_t - z_th) / (max(1e-12, abs(z_s)) + max(0.0, dk_a_t - z_th))
         return float(dk_a * activation)
+    if switching_function in {"hard_threshold", "hard-threshold", "step"}:
+        return float(dk_a if dk_a_t >= z_th else 0.0)
+    if switching_function in {"double_sigmoid", "double-sigmoid", "biphasic_sigmoid"}:
+        width = max(abs(z_s), 1e-6)
+        upper = z_th + float(astro.get("Z_upper_delta", 4.0 * width))
+        low_gate = 1.0 / (1.0 + _safe_exp((z_th - dk_a_t) * width))
+        high_gate = 1.0 / (1.0 + _safe_exp((dk_a_t - upper) * width))
+        return float(dk_a * low_gate * high_gate)
     raise ValueError(f"Unknown switching_function={switching_function!r}")
 
 

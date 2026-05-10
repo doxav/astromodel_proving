@@ -1,0 +1,38 @@
+{
+  "step_name": "Step 07 \u2014 Assumption sensitivity: gating, proxy, and compartment split",
+  "config": {
+    "max_candidates": 2,
+    "time_points": 40,
+    "t_final_ms": 50000.0,
+    "gating_families": [
+      "sigmoid",
+      "tanh",
+      "hill",
+      "soft_threshold",
+      "hard_threshold",
+      "double_sigmoid"
+    ],
+    "currents_na": [
+      100
+    ],
+    "proxy_corr_min": 0.5,
+    "proxy_rmse_max": 1.25,
+    "gating_divergence_rmse_max_mV": 8.0,
+    "heldout_pass_min": 0.3,
+    "write_outputs": true
+  },
+  "n_candidates": 2,
+  "n_gating_rows": 12,
+  "n_proxy_rows": 2,
+  "n_compartment_rows": 2,
+  "gating_families": [
+    "sigmoid",
+    "tanh",
+    "hill",
+    "soft_threshold",
+    "hard_threshold",
+    "double_sigmoid"
+  ],
+  "claim_scope": "Step 07 can mark assumptions robust or model-dependent, but final biological degeneracy claims remain disallowed until later plausibility/statistical checks pass.",
+  "elapsed_seconds": 0.8463662430003751
+}
