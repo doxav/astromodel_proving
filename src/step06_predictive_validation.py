@@ -460,7 +460,7 @@ def build_robustness_summary(
             and validation_label == "predictive_supported"
         )
         claim_scope_after_step06 = (
-            f"{step06_screen_claim}; final biological degeneracy wording remains disallowed "
+            f"{step06_screen_claim}; final degeneracy wording remains prohibited "
             "until assumption-sensitivity and parameter-plausibility checks pass"
         )
         rows.append(
