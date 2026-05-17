@@ -1,0 +1,23 @@
+parameter,identifiability_status,identifiability_source,identifiability_evidence
+K_bath_value_middle,identifiable,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+P_gap_eff,weakly_identified,step03_profile_summary,broad_valley
+Va_l,weakly_identified,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+Va_s,weakly_identified,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+ca,identifiable,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+d,weakly_identified,step03_profile_summary,broad_valley
+eps,identifiable,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+eps_middle,not_profiled,step03_effective_parameter_map,Not treated as a fitted molecular estimate in Step 03A.
+gamma_s_eff,weakly_identified,step03_profile_summary,flat_unbounded
+gamma_t_eff,weakly_identified,step03_profile_summary,broad_valley
+gki,identifiable,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+gl_a,identifiable,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+gs,weakly_identified,step03_profile_summary,flat_unbounded
+gt,weakly_identified,step03_profile_summary,broad_valley
+pk,weakly_identified,step03_profile_summary,broad_valley
+switching_function,not_profiled,step03_effective_parameter_map,Not treated as a fitted molecular estimate in Step 03A.
+volume_ratio_wa_wo,weakly_identified,step03_profile_summary,broad_valley
+w_a,not_profiled,step03_effective_parameter_map,"A fixed modeling constant in current SQLite fits, not a direct inferred quantity."
+wo,weakly_identified,step03_profile_summary,broad_valley
+wo_middle,not_profiled,step03_effective_parameter_map,Not treated as a fitted molecular estimate in Step 03A.
+zs,weakly_identified,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.
+zth,weakly_identified,step03_effective_parameter_map,Interpret only after profile/FIM support; weak profiles imply practical non-identifiability.

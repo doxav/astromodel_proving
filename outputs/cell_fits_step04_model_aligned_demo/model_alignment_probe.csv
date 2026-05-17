@@ -1,4 +1,4 @@
 condition,current_na,max_abs_rhs_delta,status
-CONTROL,75,0.0,exact_within_float_tolerance
+CONTROL,75,2.220446049250313e-16,exact_within_float_tolerance
 MFA,125,0.0,exact_within_float_tolerance
 MFA_BA,100,0.0,exact_within_float_tolerance

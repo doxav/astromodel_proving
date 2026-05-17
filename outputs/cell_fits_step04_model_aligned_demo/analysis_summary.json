@@ -4,8 +4,45 @@
   "selected_file_ids": [
     "1_DH_1_CONTROL"
   ],
+  "max_cells": 1,
   "n_cells": 1,
   "n_accepted_candidates": 1,
-  "n_reviewer_facing_cells": 1,
+  "n_reviewer_facing_cells": 0,
+  "optimization_config_hash": "da2ae22207493cdb",
+  "loss_config": {
+    "trace": {
+      "loss_type": "COMBINED",
+      "delta_huber": 1.0,
+      "gradient_loss_weight": 20.0,
+      "reduction": "sum"
+    },
+    "feature_set": "primary_no_redundant",
+    "trace_weight": 1.0,
+    "feature_weight": 1.0,
+    "binary_weight": 1.0,
+    "prior_weight": 0.0,
+    "hidden_weight": 0.0,
+    "fail_weight": 1.0,
+    "multi_objective_names": [
+      "trace",
+      "feature",
+      "binary"
+    ]
+  },
+  "optimizer_config": {
+    "backend": "least_squares",
+    "scipy_loss": "linear",
+    "scipy_f_scale": 1.0,
+    "optuna_n_trials": 100,
+    "optuna_timeout_s": null,
+    "optuna_sampler": "tpe",
+    "optuna_storage": null,
+    "optuna_study_name": null,
+    "allow_optuna_fallback": false,
+    "run_holdout": false,
+    "holdout_backend": "least_squares"
+  },
+  "step04_output_dir": "/workspace/astromodel_proving/outputs/cell_fits",
+  "step04_output_schema_version": "step04_cell_fits_v2",
   "model_alignment": "expected_model_exact_with_numerical_safeguards_only"
 }

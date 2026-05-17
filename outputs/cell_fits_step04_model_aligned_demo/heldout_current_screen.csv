@@ -1,7 +1,1 @@
-file_id,region,condition,fit_scope,heldout_sweep,train_sweeps,candidate_id,optimizer_status,optimizer_success,optimizer_cost,optimizer_nfev,heldout_trace_rmse_mV,heldout_weighted_pass_fraction,simulation_health,heldout_pass
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,1,"2,3,4,5,6",1_DH_1_CONTROL__cand_01,0,False,896.2807228277882,1,1.1638529074992885,0.34229344710142307,ok,True
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,2,"1,3,4,5,6",1_DH_1_CONTROL__cand_01,0,False,877.4005771166478,1,1.7063834420577786,0.3682925353039205,ok,True
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,3,"1,2,4,5,6",1_DH_1_CONTROL__cand_01,0,False,864.4489374338249,1,2.1030897331659713,0.362962814354161,ok,True
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,4,"1,2,3,5,6",1_DH_1_CONTROL__cand_01,0,False,838.1867109699515,1,2.1878708542651415,0.3615270221890681,ok,True
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,5,"1,2,3,4,6",1_DH_1_CONTROL__cand_01,0,False,818.5406925552525,1,2.956510815565465,0.3239072458213929,ok,True
-1_DH_1_CONTROL,DH,CONTROL,leave_one_out,6,"1,2,3,4,5",1_DH_1_CONTROL__cand_01,0,False,783.4763257728875,1,3.6428104557551557,0.30300612779724,ok,True
+

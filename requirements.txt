@@ -6,3 +6,5 @@ pytest
 nbclient
 nbformat
 ipykernel
+
+optuna

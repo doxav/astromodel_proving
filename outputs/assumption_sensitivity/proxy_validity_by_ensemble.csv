@@ -1,3 +1,2 @@
 file_id,region,condition,candidate_id,mechanism_cluster,current_na,sweep,proxy_signal,target_signal,pearson_r,spearman_r,scaled_rmse,best_lag_samples,proxy_validity_status,explicit_ecs_variant_required,simulation_status,failure_reason
-1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,100,3,delta_K_a_t,K_o,-0.18916080842058297,-0.5476804734201834,0.9819461230422324,8,proxy_limited,True,ok,
-1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,100,3,delta_K_a_t,K_o,-0.1872463509933779,-0.6090056285178237,0.9823129868018973,8,proxy_limited,True,ok,
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,M1,100,3,delta_K_a_t,K_o,-0.1818002460941282,-0.5898686679174485,0.983335482183021,8,proxy_limited,True,ok,
