@@ -1,30 +1,70 @@
 {
+  "output_schema_version": "step04_cell_fits_v2",
+  "downstream_artifacts": {
+    "candidates": "cell_fit_candidates.csv",
+    "accepted_ensembles": "accepted_cell_ensembles.csv",
+    "quality_summary": "cell_fit_quality_summary.csv",
+    "heldout_screen": "heldout_current_screen.csv",
+    "acceptance_contract": "acceptance_contract.csv",
+    "sweep_metrics": "candidate_sweep_metrics.csv",
+    "trace_inventory": "cell_trace_inventory.csv",
+    "analysis_summary": "analysis_summary.json",
+    "optimization_config": "optimization_config.json"
+  },
   "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
-  "implementation_mode": "shared-cell parameter optimization using the reviewed ODE model",
-  "n_cells": 2,
-  "n_candidates": 6,
-  "n_accepted_candidates": 6,
-  "n_reviewer_facing_cells": 2,
+  "implementation_mode": "shared-cell least-squares fitting with multi-start and leave-one-sweep-out validation",
+  "n_cells": 1,
+  "n_candidates": 1,
+  "n_accepted_candidates": 1,
+  "n_reviewer_facing_cells": 0,
   "selected_file_ids": [
-    "1_DH_1",
-    "DH_1_MFA"
+    "1_DH_1_CONTROL"
   ],
-  "candidate_transform_names": [
-    "base",
-    "low_gap",
-    "high_gap"
-  ],
-  "n_fit_points": 20,
+  "n_fit_points": 8,
+  "n_starts": 1,
+  "max_nfev_all6": 1,
+  "max_nfev_holdout": 1,
   "trace_rmse_accept": 18.0,
   "feature_pass_accept": 0.3,
-  "heldout_trace_rmse_accept": 22.0,
-  "heldout_pass_accept": 0.25,
+  "heldout_trace_rmse_accept": 20.0,
+  "heldout_pass_accept": 0.3,
   "heldout_min_pass_count": 3,
-  "accepted_top_k_per_cell": 5,
-  "optimizer_method": "coordinate_grid",
-  "optimizer_maxiter_all6": 1,
-  "optimizer_maxiter_heldout": 0,
-  "uses_expected_reviewed_model": true,
+  "accepted_top_k_per_cell": 3,
+  "optimization_config_hash": "da2ae22207493cdb",
+  "loss_config": {
+    "trace": {
+      "loss_type": "COMBINED",
+      "delta_huber": 1.0,
+      "gradient_loss_weight": 20.0,
+      "reduction": "sum"
+    },
+    "feature_set": "primary_no_redundant",
+    "trace_weight": 1.0,
+    "feature_weight": 1.0,
+    "binary_weight": 1.0,
+    "prior_weight": 0.0,
+    "hidden_weight": 0.0,
+    "fail_weight": 1.0,
+    "multi_objective_names": [
+      "trace",
+      "feature",
+      "binary"
+    ]
+  },
+  "optimizer_config": {
+    "backend": "least_squares",
+    "scipy_loss": "linear",
+    "scipy_f_scale": 1.0,
+    "optuna_n_trials": 100,
+    "optuna_timeout_s": null,
+    "optuna_sampler": "tpe",
+    "optuna_storage": null,
+    "optuna_study_name": null,
+    "allow_optuna_fallback": false,
+    "run_holdout": false,
+    "holdout_backend": "least_squares"
+  },
   "uses_step02_thresholds": true,
-  "uses_region_specific_acceptance": true
+  "uses_region_specific_acceptance": true,
+  "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only"
 }

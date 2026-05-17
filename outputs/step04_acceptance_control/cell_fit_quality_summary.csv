@@ -1,0 +1,2 @@
+file_id,region,condition,n_candidates,n_accepted_candidates,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,holdout_pass_count,holdout_mean_rmse_mV,holdout_mean_pass_fraction,cell_reviewer_facing
+1_DH_1_CONTROL,DH,CONTROL,1,1,1_DH_1_CONTROL__cand_01,3.4212472466345933,0.5,6,3.4212472466345933,0.5,True

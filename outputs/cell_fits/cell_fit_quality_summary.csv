@@ -1,3 +1,2 @@
 file_id,region,condition,n_candidates,n_accepted_candidates,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,holdout_pass_count,holdout_mean_rmse_mV,holdout_mean_pass_fraction,cell_reviewer_facing
-1_DH_1,DH,CONTROL,3,3,1_DH_1__cand_03__high_gap,12.419387008994706,0.3402183304343998,6,12.419386960237825,0.3402183306339089,True
-DH_1_MFA,DH,MFA,3,3,DH_1_MFA__cand_03__high_gap,5.569036633076972,0.6184923746037094,6,5.569036633076972,0.6184923746037094,True
+1_DH_1_CONTROL,DH,CONTROL,1,1,1_DH_1_CONTROL__cand_01,3.5542669849008153,0.35549326118775015,0,,,False

@@ -1,13 +1,5 @@
 file_id,region,condition,candidate_id,mechanism_cluster,dominant_mechanism,parameter,value,lower_bound,upper_bound,plausibility_status,identifiability_status,physiologically_interpretable,interpretation_guardrail
-1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,Mixed,P_gap_eff,0.00045,1e-08,0.005,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,Mixed,gamma_t_eff,4.974866559568845e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,Mixed,gamma_s_eff,5.59672487951495e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_01__base,M1,Mixed,volume_ratio_wa_wo,1.0,0.001,1000.0,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,Mixed,P_gap_eff,0.000315,1e-08,0.005,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,Mixed,gamma_t_eff,4.974866559568845e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,Mixed,gamma_s_eff,5.59672487951495e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_02__low_gap,M1,Mixed,volume_ratio_wa_wo,1.0,0.001,1000.0,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_03__high_gap,M1,Mixed,P_gap_eff,0.000585,1e-08,0.005,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_03__high_gap,M1,Mixed,gamma_t_eff,4.974866559568845e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_03__high_gap,M1,Mixed,gamma_s_eff,5.59672487951495e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
-1_DH_1,DH,CONTROL,1_DH_1__cand_03__high_gap,M1,Mixed,volume_ratio_wa_wo,1.0,0.001,1000.0,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,M1,Mixed,P_gap_eff,0.0001,1e-08,0.005,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,M1,Mixed,gamma_t_eff,3.3165777063792285e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,M1,Mixed,gamma_s_eff,6.633155412758457e-05,1e-08,0.05,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,M1,Mixed,volume_ratio_wa_wo,1.3333333333333333,0.001,1000.0,within_range,weakly_identified,False,within broad range but Step 03 indicates weak/sloppy/broad identifiability

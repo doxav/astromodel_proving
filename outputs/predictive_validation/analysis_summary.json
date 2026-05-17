@@ -30,14 +30,14 @@
     "require_candidate_level_heldout": true,
     "final_degeneracy_claim_allowed": false
   },
-  "n_candidates": 2,
-  "n_heldout_rows": 16,
+  "n_candidates": 1,
+  "n_heldout_rows": 8,
   "n_prediction_interval_rows": 54,
   "n_ppc_rows": 54,
-  "n_perturbation_rows": 18,
+  "n_perturbation_rows": 9,
   "validation_labels": [
     "insufficient_evidence"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 3.3655719079979463
+  "elapsed_seconds": 3.8262337500000285
 }
