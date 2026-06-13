@@ -12,8 +12,8 @@
     "trace_inventory": "cell_trace_inventory.csv"
   },
   "missing_artifacts": [],
-  "optimization_config_hash": "74346534fdbd4b05",
-  "output_dir": "/home/xav/code/astromodel_proving/outputs/step04_test_optuna_multi",
+  "optimization_config_hash": "e61866f5553ad5be",
+  "output_dir": "/home/xav/code/astromodel_proving/outputs/cell_fits_step04_acceptance_margin_100_all",
   "output_schema_version": "step04_cell_fits_v2",
   "step": "step04"
 }

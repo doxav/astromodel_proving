@@ -19,12 +19,17 @@
     },
     "trace_weight": 1.0
   },
-  "optimization_config_hash": "b520f57c4dd73884",
+  "optimization_config_hash": "c671baab78ace23c",
   "optimizer_config": {
     "allow_optuna_fallback": true,
     "backend": "optuna_scalar",
+    "candidate_top_k": 500,
     "holdout_backend": "least_squares",
+    "hybrid_refine_top_k": 3,
+    "hybrid_scipy_post_nfev": 20,
+    "hybrid_scipy_pre_nfev": 40,
     "optuna_n_trials": 2,
+    "optuna_objective": "metric_scalar",
     "optuna_sampler": "tpe",
     "optuna_storage": null,
     "optuna_study_name": null,

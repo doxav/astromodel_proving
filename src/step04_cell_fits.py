@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import sqlite3
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
@@ -10,7 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import least_squares
 
-from .astro_model import DEFAULT_Z0, simulate_odeint
+from .astro_model import DEFAULT_Z0, normalize_trace_for_target_mode, simulate_odeint
 from .atf_io import load_all_cells, load_cell_protocol, canonical_file_id
 from .atf_features import FEATURE_COLUMNS, build_feature_table, compute_feature_reliability, build_threshold_table, extract_features_from_trace
 from .feature_contracts import feature_residual_vector, score_feature_contract
@@ -20,6 +23,7 @@ from .trace_utils import baseline_center, downsample_trace
 from .step04_loss import (
     Step04LossConfig,
     Step04OptimizerConfig,
+    TraceLossConfig,
     compute_trace_objective,
     config_hash,
     feature_columns_for_loss,
@@ -44,6 +48,16 @@ N_FIT_POINTS_DEFAULT = 40
 N_STARTS_DEFAULT = 3
 MAX_NFEV_ALL6_DEFAULT = 60
 MAX_NFEV_HOLDOUT_DEFAULT = 40
+TRACE_SHAPE_OBJECTIVE_SPECS: dict[str, tuple[str, str]] = {
+    "trace_shape": ("COMBINED", "default"),
+    "trace_shape_l2": ("L2", "default"),
+    "trace_shape_l1": ("L1", "default"),
+    "trace_shape_huber": ("HUBER", "default"),
+    "trace_shape_log_cosh": ("LOG_COSH", "default"),
+}
+for _target_mode in ("default", "centered", "centered_scaled"):
+    for _loss_type in ("L2", "L1", "HUBER", "LOG_COSH", "COMBINED"):
+        TRACE_SHAPE_OBJECTIVE_SPECS[f"trace_shape_{_loss_type.lower()}_{_target_mode}"] = (_loss_type, _target_mode)
 
 BASE_CONDITION_DEFAULTS: dict[str, dict[str, Any]] = {
     "CONTROL": dict(ca=400.0, gl_a=0.01, Va_l=-70.0, Va_s=-90.0, switching_function="sigmoid", w_a=2000.0, eps_middle=1.0, wo_middle=1.0, g_k_a=0.0),
@@ -53,6 +67,15 @@ BASE_CONDITION_DEFAULTS: dict[str, dict[str, Any]] = {
 
 EFFECTIVE_KEYS = ("P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo")
 OPTIMIZED_KEYS = ("P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo", "gki", "eps", "gl_a", "zth", "zs")
+STEP02_HISTORICAL_FILE_ID_ALIASES: dict[str, str] = {
+    "DH_old": "DH_1_CONTROL",
+    "DH_old_CONTROL": "DH_1_CONTROL",
+    "DH_old_2": "DH_2_CONTROL",
+    "DH_old_2_CONTROL": "DH_2_CONTROL",
+    "VH_OG_MFA": "VH_7_OG_MFA",
+    "VH_OG_MFA_Ba": "VH_7_OG_MFA_BA",
+    "VH_OG_MFA_BA": "VH_7_OG_MFA_BA",
+}
 
 
 @dataclass(frozen=True)
@@ -87,11 +110,17 @@ class Step04Config:
     accepted_top_k_per_cell: int = ACCEPTED_TOP_K_PER_CELL_DEFAULT
     loss_config: Step04LossConfig = field(default_factory=Step04LossConfig)
     optimizer_config: Step04OptimizerConfig = field(default_factory=Step04OptimizerConfig)
+    cell_fit_workers: int | str = 1
 
     def resolve(self) -> "Step04Config":
         if self.output_dir is None:
             self.output_dir = self.project_root / "outputs" / "cell_fits"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        if isinstance(self.cell_fit_workers, str):
+            if self.cell_fit_workers != "auto":
+                raise ValueError("cell_fit_workers must be a positive integer or 'auto'")
+        elif int(self.cell_fit_workers) < 1:
+            raise ValueError("cell_fit_workers must be >= 1")
         return self
 
 
@@ -105,6 +134,49 @@ def _project_paths(project_root: str | Path) -> dict[str, Path]:
         "postfit_dir": root / "outputs" / "postfit_sqlite",
         "cell_fit_dir": root / "outputs" / "cell_fits",
     }
+
+
+def _append_exact_feature_id_aliases(feature_df: pd.DataFrame, aliases: Mapping[str, str]) -> pd.DataFrame:
+    """Duplicate cached Step 02 feature rows under canonical Step 04 file ids."""
+
+    if "file_id" not in feature_df.columns:
+        return feature_df
+    ids = feature_df["file_id"].astype(str)
+    known_ids = set(ids)
+    alias_frames: list[pd.DataFrame] = []
+    for source_id, target_id in aliases.items():
+        if source_id not in known_ids or target_id in known_ids:
+            continue
+        alias_rows = feature_df.loc[ids.eq(source_id)].copy()
+        if alias_rows.empty:
+            continue
+        alias_rows["file_id"] = target_id
+        alias_frames.append(alias_rows)
+        known_ids.add(target_id)
+    if not alias_frames:
+        return feature_df
+    return pd.concat([feature_df, *alias_frames], ignore_index=True)
+
+
+def _append_ba_feature_id_aliases(feature_df: pd.DataFrame) -> pd.DataFrame:
+    if "file_id" not in feature_df.columns:
+        return feature_df
+    ids = feature_df["file_id"].astype(str)
+    known_ids = set(ids)
+    alias_frames: list[pd.DataFrame] = []
+    for source_id in sorted(id_value for id_value in known_ids if "Ba" in id_value):
+        target_id = source_id.replace("Ba", "BA")
+        if target_id in known_ids:
+            continue
+        alias_rows = feature_df.loc[ids.eq(source_id)].copy()
+        if alias_rows.empty:
+            continue
+        alias_rows["file_id"] = target_id
+        alias_frames.append(alias_rows)
+        known_ids.add(target_id)
+    if not alias_frames:
+        return feature_df
+    return pd.concat([feature_df, *alias_frames], ignore_index=True)
 
 
 def load_step02_outputs_or_run(project_root: Path, reuse_existing: bool = True) -> dict[str, pd.DataFrame]:
@@ -123,6 +195,11 @@ def load_step02_outputs_or_run(project_root: Path, reuse_existing: bool = True) 
             feature_df.loc[control_mask, "file_id"] = feature_df.loc[control_mask, "file_id"].astype(str) + "_CONTROL"
             if bool(control_mask.any()):
                 compatibility_actions.append("appended_CONTROL_suffix_to_cached_control_file_ids")
+        before_alias_count = len(feature_df)
+        feature_df = _append_ba_feature_id_aliases(feature_df)
+        feature_df = _append_exact_feature_id_aliases(feature_df, STEP02_HISTORICAL_FILE_ID_ALIASES)
+        if len(feature_df) > before_alias_count:
+            compatibility_actions.append("appended_historical_step02_file_id_aliases")
         if "stim_end_depolarization_mV" not in feature_df.columns:
             if "plateau_level_mV" in feature_df.columns and "baseline_mV" in feature_df.columns:
                 feature_df["stim_end_depolarization_mV"] = pd.to_numeric(feature_df["plateau_level_mV"], errors="coerce") - pd.to_numeric(feature_df["baseline_mV"], errors="coerce")
@@ -374,7 +451,8 @@ def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tu
         {"P_gap_eff": 1.4, "gamma_t_eff": 0.8, "gamma_s_eff": 1.4, "volume_ratio_wa_wo": 0.9, "gki": 1.2, "eps": 0.8, "gl_a": 1.0, "zth": 1.0, "zs": 0.7},
         {"P_gap_eff": 0.8, "gamma_t_eff": 0.8, "gamma_s_eff": 1.2, "volume_ratio_wa_wo": 1.3, "gki": 1.1, "eps": 1.5, "gl_a": 0.8, "zth": 1.2, "zs": 1.0},
     ]
-    for idx, scale in enumerate(scales[: max(1, n_starts)], start=1):
+    requested_starts = max(1, int(n_starts))
+    for idx, scale in enumerate(scales[:requested_starts], start=1):
         named = dict(base_named)
         for k, f in scale.items():
             if k == "zth":
@@ -382,6 +460,15 @@ def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tu
             else:
                 named[k] = max(float(named[k]) * float(f), 1e-10)
         starts.append((_named_to_x(named), seed_source, f"start_{idx:02d}"))
+    if len(starts) < requested_starts:
+        rng = np.random.default_rng(1701)
+        lower, upper = _x_bounds()
+        base_x = _named_to_x(base_named)
+        jitter_width = np.asarray([1.4, 1.4, 1.4, 0.7, 0.7, 1.0, 1.0, 15.0, 1.0], dtype=float)
+        while len(starts) < requested_starts:
+            idx = len(starts) + 1
+            jittered = np.clip(base_x + rng.uniform(-jitter_width, jitter_width), lower, upper)
+            starts.append((jittered, seed_source, f"start_{idx:02d}"))
     return starts
 
 
@@ -505,6 +592,224 @@ def _score_candidate_metrics(params: Mapping[str, Any], trace_inventory: Mapping
     }
     return df, agg
 
+
+def _balanced_objective_components_from_x(
+    condition: str,
+    x: np.ndarray,
+    sweeps_to_fit: Sequence[int],
+    trace_inventory: Mapping[int, SweepTrace],
+    empirical_rows: Mapping[int, Mapping[str, Any]],
+    thresholds_df: pd.DataFrame,
+    cfg: Step04Config,
+    prior_reference_x: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Compute a fast, scaled Optuna objective without building full score tables."""
+
+    params = _params_from_x(condition, x, seed_source="optuna_objective", start_label="trial")
+    feature_columns = feature_columns_for_loss(cfg.loss_config.feature_set)
+    trace_losses: list[float] = []
+    feature_losses: list[float] = []
+    binary_losses: list[float] = []
+    n_failures = 0
+    trace_scale = max(float(cfg.trace_scale_mV), 1e-9)
+    gradient_weight = float(cfg.loss_config.trace.gradient_loss_weight)
+    for sweep_idx in sweeps_to_fit:
+        sweep_trace = trace_inventory[sweep_idx]
+        try:
+            sim_vm, sim_features, onset_s = _simulate_sweep(params, sweep_trace)
+            if not np.isfinite(sim_vm).all():
+                raise ValueError("non-finite simulated voltage trace")
+            exp_bs = _baseline_subtract(sweep_trace.vm_fit, sweep_trace.time_ms_fit, onset_s) / trace_scale
+            sim_bs = _baseline_subtract(sim_vm, sweep_trace.time_ms_fit, onset_s) / trace_scale
+            trace_delta = np.clip(sim_bs - exp_bs, -20.0, 20.0)
+            trace_loss = float(np.mean(trace_delta**2))
+            if gradient_weight > 0 and sim_bs.size > 1:
+                gradient_delta = np.clip(np.gradient(sim_bs) - np.gradient(exp_bs), -20.0, 20.0)
+                trace_loss += gradient_weight * float(np.mean(np.abs(gradient_delta)))
+            feature_resid = _feature_residuals(
+                sim_features,
+                empirical_rows[sweep_idx],
+                thresholds_df,
+                sweep_trace.region,
+                sweep_trace.condition,
+                sweep_idx,
+                feature_columns=feature_columns,
+            )
+            binary_resid = _binary_residuals(sim_features, empirical_rows[sweep_idx])
+            trace_losses.append(trace_loss)
+            feature_arr = np.clip(np.asarray(feature_resid, dtype=float), -10.0, 10.0)
+            binary_arr = np.clip(np.asarray(binary_resid, dtype=float), -10.0, 10.0)
+            feature_losses.append(float(np.mean(feature_arr**2)) if feature_arr.size else 0.0)
+            binary_losses.append(float(np.mean(binary_arr**2)) if binary_arr.size else 0.0)
+        except Exception:
+            n_failures += 1
+            trace_losses.append(100.0)
+            feature_losses.append(25.0)
+            binary_losses.append(4.0)
+
+    return {
+        "trace": float(np.mean(trace_losses)) if trace_losses else 1e12,
+        "feature": float(np.mean(feature_losses)) if feature_losses else 1.0,
+        "binary": float(np.mean(binary_losses)) if binary_losses else 1.0,
+        "prior": _weak_prior_penalty_from_x(x, prior_reference_x),
+        "hidden": 0.0,
+        "fail": float(n_failures),
+    }
+
+
+def _transform_trace_for_objective(trace: np.ndarray, target_mean_mode: str) -> np.ndarray:
+    """Apply the legacy target transform used by trace-shape Optuna objectives."""
+
+    mode = str(target_mean_mode or "default").lower()
+    if mode == "default":
+        return np.asarray(trace, dtype=float)
+    return normalize_trace_for_target_mode(trace, mode)
+
+
+def _trace_objective_loss(sim_trace: np.ndarray, exp_trace: np.ndarray, loss_type: str, loss_config: Step04LossConfig) -> float:
+    """Compute a clipped mean trace objective for one Optuna trial sweep."""
+
+    residual = np.clip(np.asarray(sim_trace, dtype=float) - np.asarray(exp_trace, dtype=float), -20.0, 20.0)
+    zeros = np.zeros_like(residual, dtype=float)
+    trace_config = TraceLossConfig(
+        loss_type=loss_type,
+        delta_huber=float(loss_config.trace.delta_huber),
+        gradient_loss_weight=float(loss_config.trace.gradient_loss_weight),
+        reduction="mean",
+    )
+    return compute_trace_objective(residual, zeros, trace_config)
+
+
+def _trace_shape_objective_components_from_x(
+    condition: str,
+    x: np.ndarray,
+    sweeps_to_fit: Sequence[int],
+    trace_inventory: Mapping[int, SweepTrace],
+    cfg: Step04Config,
+    prior_reference_x: np.ndarray | None = None,
+    loss_type: str = "COMBINED",
+    target_mean_mode: str = "default",
+) -> dict[str, float]:
+    """Compute the fastest Optuna objective: clipped baseline-subtracted trace shape only."""
+
+    params = _params_from_x(condition, x, seed_source="optuna_trace_shape", start_label="trial")
+    trace_losses: list[float] = []
+    n_failures = 0
+    trace_scale = max(float(cfg.trace_scale_mV), 1e-9)
+    for sweep_idx in sweeps_to_fit:
+        sweep_trace = trace_inventory[sweep_idx]
+        try:
+            protocol = {
+                "experiment_type": sweep_trace.condition,
+                "current_na": sweep_trace.current_na,
+                "t_eval_ms": sweep_trace.time_ms_fit,
+            }
+            sim = simulate_odeint(
+                params,
+                protocol,
+                z0=DEFAULT_Z0,
+                t_eval_ms=sweep_trace.time_ms_fit,
+                return_hidden=False,
+            )
+            sim_vm = np.asarray(sim["Vm"], dtype=float)
+            if not np.isfinite(sim_vm).all():
+                raise ValueError("non-finite simulated voltage trace")
+            onset_s = _default_onset_s(sweep_trace.condition)
+            exp_bs = _baseline_subtract(sweep_trace.vm_fit, sweep_trace.time_ms_fit, onset_s) / trace_scale
+            sim_bs = _baseline_subtract(sim_vm, sweep_trace.time_ms_fit, onset_s) / trace_scale
+            exp_obj = _transform_trace_for_objective(exp_bs, target_mean_mode)
+            sim_obj = _transform_trace_for_objective(sim_bs, target_mean_mode)
+            trace_loss = _trace_objective_loss(sim_obj, exp_obj, loss_type, cfg.loss_config)
+            trace_losses.append(trace_loss)
+        except Exception:
+            n_failures += 1
+            trace_losses.append(100.0)
+    return {
+        "trace": float(np.mean(trace_losses)) if trace_losses else 1e12,
+        "feature": 0.0,
+        "binary": 0.0,
+        "prior": _weak_prior_penalty_from_x(x, prior_reference_x),
+        "hidden": 0.0,
+        "fail": float(n_failures),
+    }
+
+
+def _acceptance_margin_objective_components_from_x(
+    condition: str,
+    x: np.ndarray,
+    trace_inventory: Mapping[int, SweepTrace],
+    empirical_rows: Mapping[int, Mapping[str, Any]],
+    thresholds_df: pd.DataFrame,
+    cfg: Step04Config,
+    prior_reference_x: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Optimize directly against Step04 trace and feature acceptance margins."""
+
+    params = _params_from_x(condition, x, seed_source="optuna_acceptance_margin", start_label="trial")
+    _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
+    trace_rmse = float(agg.get("mean_trace_rmse_mV", np.inf))
+    trace_ratio = trace_rmse / max(float(cfg.trace_rmse_accept), 1e-9) if np.isfinite(trace_rmse) else 100.0
+    weighted_pass_fraction = float(agg.get("mean_weighted_pass_fraction", 0.0))
+    return {
+        "trace": float(np.clip(trace_ratio, 0.0, 100.0)),
+        "feature": float(np.clip(1.0 - weighted_pass_fraction, 0.0, 1.0)),
+        "binary": float(agg.get("mean_binary_penalty", 1.0)),
+        "prior": _weak_prior_penalty_from_x(x, prior_reference_x),
+        "hidden": 0.0,
+        "fail": float(agg.get("n_failures", 0.0)),
+    }
+
+
+def _optuna_objective_components_from_x(
+    condition: str,
+    x: np.ndarray,
+    sweeps_to_fit: Sequence[int],
+    trace_inventory: Mapping[int, SweepTrace],
+    empirical_rows: Mapping[int, Mapping[str, Any]],
+    thresholds_df: pd.DataFrame,
+    cfg: Step04Config,
+    prior_reference_x: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Evaluate the configured Optuna objective components for one transformed parameter vector."""
+
+    if cfg.optimizer_config.optuna_objective == "metric_scalar":
+        params = _params_from_x(condition, x, seed_source="optuna", start_label="trial")
+        _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
+        return _objective_components_from_agg(agg, prior_penalty=_weak_prior_penalty_from_x(x, prior_reference_x))
+    if cfg.optimizer_config.optuna_objective in TRACE_SHAPE_OBJECTIVE_SPECS:
+        loss_type, target_mean_mode = TRACE_SHAPE_OBJECTIVE_SPECS[cfg.optimizer_config.optuna_objective]
+        return _trace_shape_objective_components_from_x(
+            condition,
+            x,
+            sweeps_to_fit,
+            trace_inventory,
+            cfg,
+            prior_reference_x=prior_reference_x,
+            loss_type=loss_type,
+            target_mean_mode=target_mean_mode,
+        )
+    if cfg.optimizer_config.optuna_objective == "acceptance_margin":
+        return _acceptance_margin_objective_components_from_x(
+            condition,
+            x,
+            trace_inventory,
+            empirical_rows,
+            thresholds_df,
+            cfg,
+            prior_reference_x=prior_reference_x,
+        )
+    return _balanced_objective_components_from_x(
+        condition,
+        x,
+        sweeps_to_fit,
+        trace_inventory,
+        empirical_rows,
+        thresholds_df,
+        cfg,
+        prior_reference_x=prior_reference_x,
+    )
+
+
 def acceptance_contract_table(cfg: Step04Config | None = None) -> pd.DataFrame:
     cfg = cfg or Step04Config(project_root=Path("."))
     rows = [
@@ -553,6 +858,12 @@ def _candidate_acceptance_flags(row: Mapping[str, Any], cfg: Step04Config) -> di
 
 def _suggest_named_from_trial(trial: Any, lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
     return np.asarray([trial.suggest_float(name, float(lo), float(hi)) for name, lo, hi in zip(OPTIMIZED_KEYS, lower, upper)], dtype=float)
+
+
+def _trial_params_from_x(x: np.ndarray) -> dict[str, float]:
+    """Return Optuna trial parameters in the internal transformed coordinate space."""
+
+    return {name: float(value) for name, value in zip(OPTIMIZED_KEYS, np.asarray(x, dtype=float))}
 
 
 def _optuna_sampler(optimizer_config: Step04OptimizerConfig) -> Any:
@@ -648,6 +959,43 @@ def _rank_candidate_df(candidate_rows: list[dict[str, Any]], cfg: Step04Config) 
     return cand_df
 
 
+def _write_step04_sqlite(output_dir: Path, tables: Mapping[str, pd.DataFrame], metadata: Mapping[str, Any]) -> Path:
+    """Write Step 04 run tables to a SQLite database for later candidate reanalysis."""
+
+    db_path = output_dir / "step04_cell_fits.sqlite"
+    if db_path.exists():
+        db_path.unlink()
+    with sqlite3.connect(db_path) as con:
+        for table_name, table_df in tables.items():
+            if table_df.empty and len(table_df.columns) == 0:
+                con.execute(f'CREATE TABLE "{table_name}" (_empty INTEGER)')
+                continue
+            table_df.to_sql(table_name, con, if_exists="replace", index=False)
+        metadata_df = pd.DataFrame(
+            [
+                {
+                    "key": str(key),
+                    "value_json": json.dumps(value, sort_keys=True, allow_nan=False),
+                }
+                for key, value in metadata.items()
+            ]
+        )
+        metadata_df.to_sql("run_metadata", con, if_exists="replace", index=False)
+        for table_name, columns in {
+            "cell_fit_candidates": ("file_id", "candidate_id"),
+            "candidate_sweep_metrics": ("file_id", "candidate_id", "sweep"),
+            "heldout_current_screen": ("file_id", "candidate_id", "heldout_sweep"),
+        }.items():
+            present = {
+                row[1]
+                for row in con.execute(f'PRAGMA table_info("{table_name}")').fetchall()
+            }
+            if all(column in present for column in columns):
+                index_cols = ", ".join(f'"{column}"' for column in columns)
+                con.execute(f'CREATE INDEX "idx_{table_name}_keys" ON "{table_name}" ({index_cols})')
+    return db_path
+
+
 def _fit_cell_all6_least_squares(project_root: Path, file_id: str, trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     condition = next(iter(trace_inventory.values())).condition
     lower, upper = _x_bounds()
@@ -731,11 +1079,12 @@ def _fit_cell_all6_optuna_fallback(project_root: Path, file_id: str, trace_inven
             values = (scalarize_components(components, cfg.loss_config),)
         scalar = scalarize_components(components, cfg.loss_config)
         evaluated.append((_FallbackTrial(number, values), x, components, scalar))
+    candidate_top_k = max(1, int(cfg.optimizer_config.candidate_top_k))
     if cfg.optimizer_config.backend == "optuna_multi":
-        selected = sorted(evaluated, key=lambda item: item[3])[: cfg.accepted_top_k_per_cell]
+        selected = sorted(evaluated, key=lambda item: item[3])[:candidate_top_k]
         pareto_numbers = _non_dominated_trial_numbers(evaluated)
     else:
-        selected = sorted(evaluated, key=lambda item: item[3])[: max(1, cfg.accepted_top_k_per_cell)]
+        selected = sorted(evaluated, key=lambda item: item[3])[:candidate_top_k]
         pareto_numbers = set()
     candidate_rows: list[dict[str, Any]] = []
     sweep_rows: list[pd.DataFrame] = []
@@ -764,6 +1113,158 @@ def _fit_cell_all6_optuna_fallback(project_root: Path, file_id: str, trace_inven
     return _rank_candidate_df(candidate_rows, cfg), pd.concat(sweep_rows, ignore_index=True) if sweep_rows else pd.DataFrame()
 
 
+def _fit_cell_all6_hybrid(project_root: Path, file_id: str, trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run SciPy prefit, seeded Optuna search, and SciPy refinement of top trials."""
+
+    try:
+        import optuna
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Hybrid Step 04 backend requires optuna. Install requirements.txt or use backend='least_squares'."
+        ) from exc
+
+    condition = next(iter(trace_inventory.values())).condition
+    lower, upper = _x_bounds()
+    starts = _start_vectors(project_root, condition, max(1, cfg.n_starts))
+    prior_x = starts[0][0]
+    all_sweeps = list(sorted(trace_inventory))
+    pre_nfev = min(int(cfg.optimizer_config.hybrid_scipy_pre_nfev), int(cfg.max_nfev_all6))
+    post_nfev = min(int(cfg.optimizer_config.hybrid_scipy_post_nfev), int(cfg.max_nfev_all6))
+    refine_top_k = max(1, int(cfg.optimizer_config.hybrid_refine_top_k))
+    candidate_top_k = max(1, int(cfg.optimizer_config.candidate_top_k))
+
+    candidate_rows: list[dict[str, Any]] = []
+    sweep_rows: list[pd.DataFrame] = []
+    seeded_xs: list[np.ndarray] = []
+
+    for start_idx, (x0, seed_source, start_label) in enumerate(starts, start=1):
+        result = least_squares(
+            _residual_vector,
+            x0=x0,
+            bounds=(lower, upper),
+            args=(condition, all_sweeps, trace_inventory, empirical_rows, thresholds_df, cfg),
+            max_nfev=pre_nfev,
+            method="trf",
+            loss=cfg.optimizer_config.scipy_loss,
+            f_scale=cfg.optimizer_config.scipy_f_scale,
+        )
+        seeded_xs.append(np.asarray(result.x, dtype=float))
+        row, sweep_df = _candidate_row_from_solution(
+            file_id=file_id,
+            condition=condition,
+            trace_inventory=trace_inventory,
+            empirical_rows=empirical_rows,
+            thresholds_df=thresholds_df,
+            cfg=cfg,
+            x=result.x,
+            candidate_id=f"{file_id}__hybrid_pre_{start_idx:02d}",
+            seed_source=seed_source,
+            start_label=f"hybrid_pre_{start_label}",
+            optimizer_status=int(result.status),
+            optimizer_success=bool(result.success),
+            optimizer_cost=float(result.cost),
+            optimizer_nfev=int(result.nfev),
+            prior_reference_x=x0,
+        )
+        row["hybrid_stage"] = "scipy_pre"
+        candidate_rows.append(row)
+        sweep_rows.append(sweep_df)
+
+    trial_cache: dict[int, tuple[np.ndarray, dict[str, float]]] = {}
+
+    def evaluate_x(x: np.ndarray) -> dict[str, float]:
+        return _optuna_objective_components_from_x(
+            condition,
+            x,
+            all_sweeps,
+            trace_inventory,
+            empirical_rows,
+            thresholds_df,
+            cfg,
+            prior_reference_x=prior_x,
+        )
+
+    def objective(trial: Any) -> float:
+        x = _suggest_named_from_trial(trial, lower, upper)
+        components = evaluate_x(x)
+        trial_cache[trial.number] = (x, components)
+        return scalarize_components(components, cfg.loss_config)
+
+    sampler = _optuna_sampler(cfg.optimizer_config)
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=sampler,
+        storage=cfg.optimizer_config.optuna_storage,
+        study_name=cfg.optimizer_config.optuna_study_name,
+        load_if_exists=bool(cfg.optimizer_config.optuna_storage and cfg.optimizer_config.optuna_study_name),
+    )
+    for x in seeded_xs:
+        study.enqueue_trial(_trial_params_from_x(x))
+    study.optimize(objective, n_trials=cfg.optimizer_config.optuna_n_trials, timeout=cfg.optimizer_config.optuna_timeout_s)
+
+    complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE and t.number in trial_cache]
+    ranked_trials = sorted(complete, key=lambda t: float(t.value if t.value is not None else np.inf))
+    for idx, trial in enumerate(ranked_trials[:candidate_top_k], start=1):
+        x = trial_cache[trial.number][0]
+        row, sweep_df = _candidate_row_from_solution(
+            file_id=file_id,
+            condition=condition,
+            trace_inventory=trace_inventory,
+            empirical_rows=empirical_rows,
+            thresholds_df=thresholds_df,
+            cfg=cfg,
+            x=x,
+            candidate_id=f"{file_id}__hybrid_optuna_{idx:03d}",
+            seed_source="hybrid_optuna",
+            start_label=f"trial_{trial.number}",
+            optimizer_status=1,
+            optimizer_success=True,
+            optimizer_cost=float(scalarize_components(trial_cache[trial.number][1], cfg.loss_config)),
+            optimizer_nfev=1,
+            prior_reference_x=prior_x,
+            optuna_trial=trial,
+        )
+        row["hybrid_stage"] = "optuna_seeded"
+        candidate_rows.append(row)
+        sweep_rows.append(sweep_df)
+
+        if idx > refine_top_k:
+            continue
+        result = least_squares(
+            _residual_vector,
+            x0=x,
+            bounds=(lower, upper),
+            args=(condition, all_sweeps, trace_inventory, empirical_rows, thresholds_df, cfg),
+            max_nfev=post_nfev,
+            method="trf",
+            loss=cfg.optimizer_config.scipy_loss,
+            f_scale=cfg.optimizer_config.scipy_f_scale,
+        )
+        refined_row, refined_sweep_df = _candidate_row_from_solution(
+            file_id=file_id,
+            condition=condition,
+            trace_inventory=trace_inventory,
+            empirical_rows=empirical_rows,
+            thresholds_df=thresholds_df,
+            cfg=cfg,
+            x=result.x,
+            candidate_id=f"{file_id}__hybrid_post_{idx:03d}",
+            seed_source="hybrid_scipy_post",
+            start_label=f"post_trial_{trial.number}",
+            optimizer_status=int(result.status),
+            optimizer_success=bool(result.success),
+            optimizer_cost=float(result.cost),
+            optimizer_nfev=int(result.nfev),
+            prior_reference_x=x,
+        )
+        refined_row["hybrid_stage"] = "scipy_post"
+        refined_row["hybrid_parent_trial_number"] = int(trial.number)
+        candidate_rows.append(refined_row)
+        sweep_rows.append(refined_sweep_df)
+
+    return _rank_candidate_df(candidate_rows, cfg), pd.concat(sweep_rows, ignore_index=True) if sweep_rows else pd.DataFrame()
+
+
 def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     try:
         import optuna
@@ -782,9 +1283,16 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
     trial_cache: dict[int, tuple[np.ndarray, dict[str, float]]] = {}
 
     def evaluate_x(x: np.ndarray) -> dict[str, float]:
-        params = _params_from_x(condition, x, seed_source="optuna", start_label="trial")
-        _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
-        return _objective_components_from_agg(agg, prior_penalty=_weak_prior_penalty_from_x(x, prior_x))
+        return _optuna_objective_components_from_x(
+            condition,
+            x,
+            list(sorted(trace_inventory)),
+            trace_inventory,
+            empirical_rows,
+            thresholds_df,
+            cfg,
+            prior_reference_x=prior_x,
+        )
 
     def objective(trial: Any) -> float | tuple[float, ...]:
         x = _suggest_named_from_trial(trial, lower, upper)
@@ -808,11 +1316,11 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
     study.optimize(objective, n_trials=cfg.optimizer_config.optuna_n_trials, timeout=cfg.optimizer_config.optuna_timeout_s)
 
     if cfg.optimizer_config.backend == "optuna_multi":
-        source_trials = sorted(study.best_trials, key=lambda t: scalarize_components(trial_cache[t.number][1], cfg.loss_config))[: cfg.accepted_top_k_per_cell]
+        source_trials = sorted(study.best_trials, key=lambda t: scalarize_components(trial_cache[t.number][1], cfg.loss_config))[: max(1, int(cfg.optimizer_config.candidate_top_k))]
         pareto_numbers = {t.number for t in study.best_trials}
     else:
         complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-        source_trials = sorted(complete, key=lambda t: float(t.value if t.value is not None else np.inf))[: max(1, cfg.accepted_top_k_per_cell)]
+        source_trials = sorted(complete, key=lambda t: float(t.value if t.value is not None else np.inf))[: max(1, int(cfg.optimizer_config.candidate_top_k))]
         pareto_numbers = set()
 
     candidate_rows: list[dict[str, Any]] = []
@@ -846,6 +1354,8 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
 def _fit_cell_all6(project_root: Path, file_id: str, trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     if cfg.optimizer_config.backend == "least_squares":
         return _fit_cell_all6_least_squares(project_root, file_id, trace_inventory, empirical_rows, thresholds_df, cfg)
+    if cfg.optimizer_config.backend == "hybrid":
+        return _fit_cell_all6_hybrid(project_root, file_id, trace_inventory, empirical_rows, thresholds_df, cfg)
     if cfg.optimizer_config.backend in {"optuna_scalar", "optuna_multi"}:
         return _fit_cell_all6_optuna(project_root, file_id, trace_inventory, empirical_rows, thresholds_df, cfg)
     raise ValueError(f"invalid Step 04 optimizer backend {cfg.optimizer_config.backend!r}")
@@ -954,10 +1464,12 @@ def build_best_candidate_overlay_table(candidates_df: pd.DataFrame, trace_invent
 
 def evaluate_cell_candidates(project_root: str | Path, file_id: str, trace_inventory_all: Mapping[str, Mapping[int, SweepTrace]], feature_df: pd.DataFrame, thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     sweeps = trace_inventory_all[file_id]
-    empirical_rows = {
-        int(sweep_idx): feature_df[(feature_df["file_id"] == file_id) & (feature_df["sweep"] == sweep_idx)].iloc[0].to_dict()
-        for sweep_idx in sorted(sweeps)
-    }
+    empirical_rows: dict[int, dict[str, Any]] = {}
+    for sweep_idx in sorted(sweeps):
+        rows = feature_df[(feature_df["file_id"] == file_id) & (feature_df["sweep"] == sweep_idx)]
+        if rows.empty:
+            raise ValueError(f"Missing Step 02 feature row for file_id={file_id!r}, sweep={int(sweep_idx)}")
+        empirical_rows[int(sweep_idx)] = rows.iloc[0].to_dict()
     cand_df, sweep_df = _fit_cell_all6(Path(project_root), file_id, sweeps, empirical_rows, thresholds_df, cfg)
     held_df = pd.DataFrame()
     if not cand_df.empty:
@@ -981,6 +1493,36 @@ def evaluate_cell_candidates(project_root: str | Path, file_id: str, trace_inven
     return cand_df, sweep_df, {"heldout": held_df, "summary": summary}
 
 
+def _resolve_cell_fit_workers(cell_fit_workers: int | str, n_cells: int) -> int:
+    if n_cells < 1:
+        return 1
+    if isinstance(cell_fit_workers, str):
+        if cell_fit_workers != "auto":
+            raise ValueError("cell_fit_workers must be a positive integer or 'auto'")
+        requested = os.cpu_count() or 1
+    else:
+        requested = int(cell_fit_workers)
+        if requested < 1:
+            raise ValueError("cell_fit_workers must be >= 1")
+    return max(1, min(int(requested), int(n_cells)))
+
+
+def _evaluate_cell_candidates_task(task: tuple[Path, str, Mapping[int, SweepTrace], pd.DataFrame, pd.DataFrame, Step04Config]) -> tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    project_root, file_id, sweeps, feature_df, thresholds_df, cfg = task
+    try:
+        cand_df, sweep_df, extra = evaluate_cell_candidates(
+            project_root,
+            file_id,
+            {file_id: sweeps},
+            feature_df,
+            thresholds_df,
+            cfg,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Step 04 cell fit failed for file_id={file_id!r}") from exc
+    return file_id, cand_df, sweep_df, extra["heldout"], extra["summary"]
+
+
 def run_step04_cell_specific_six_sweep_fitting(
     project_root: str | Path,
     output_dir: str | Path | None = None,
@@ -990,6 +1532,11 @@ def run_step04_cell_specific_six_sweep_fitting(
     n_starts: int = N_STARTS_DEFAULT,
     max_nfev_all6: int = MAX_NFEV_ALL6_DEFAULT,
     max_nfev_holdout: int = MAX_NFEV_HOLDOUT_DEFAULT,
+    n_fit_scipy_pre_points: int | None = None,
+    n_fit_optuna_points: int | None = None,
+    n_fit_scipy_post_points: int | None = None,
+    max_nfunc_ev_all6: int | None = None,
+    max_nfunc_ev_holdout: int | None = None,
     trace_rmse_accept: float = TRACE_RMSE_ACCEPT_DEFAULT,
     feature_pass_accept: float = FEATURE_PASS_ACCEPT_DEFAULT,
     heldout_trace_rmse_accept: float = HELDOUT_TRACE_RMSE_ACCEPT_DEFAULT,
@@ -1001,6 +1548,7 @@ def run_step04_cell_specific_six_sweep_fitting(
     optimizer_config: Step04OptimizerConfig | None = None,
     optimizer_backend: str | None = None,
     optuna_n_trials: int | None = None,
+    cell_fit_workers: int | str = 1,
     feature_set: str | None = None,
     trace_loss_type: str | None = None,
 ) -> dict[str, pd.DataFrame]:
@@ -1014,6 +1562,16 @@ def run_step04_cell_specific_six_sweep_fitting(
         base_optimizer_config = replace(base_optimizer_config, backend=optimizer_backend)
     if optuna_n_trials is not None:
         base_optimizer_config = replace(base_optimizer_config, optuna_n_trials=optuna_n_trials)
+    if n_fit_optuna_points is not None:
+        base_optimizer_config = replace(base_optimizer_config, optuna_n_trials=int(n_fit_optuna_points))
+    if n_fit_scipy_pre_points is not None:
+        base_optimizer_config = replace(base_optimizer_config, hybrid_scipy_pre_nfev=int(n_fit_scipy_pre_points))
+    if n_fit_scipy_post_points is not None:
+        base_optimizer_config = replace(base_optimizer_config, hybrid_scipy_post_nfev=int(n_fit_scipy_post_points))
+    if max_nfunc_ev_all6 is not None:
+        max_nfev_all6 = int(max_nfunc_ev_all6)
+    if max_nfunc_ev_holdout is not None:
+        max_nfev_holdout = int(max_nfunc_ev_holdout)
     cfg = Step04Config(
         project_root=Path(project_root).resolve(),
         output_dir=(Path(output_dir) if output_dir is not None else None),
@@ -1031,6 +1589,7 @@ def run_step04_cell_specific_six_sweep_fitting(
         accepted_top_k_per_cell=accepted_top_k_per_cell,
         loss_config=base_loss_config,
         optimizer_config=base_optimizer_config,
+        cell_fit_workers=cell_fit_workers,
     ).resolve()
     optimization_config = write_optimization_config(cfg.output_dir, cfg.loss_config, cfg.optimizer_config)
     paths = _project_paths(cfg.project_root)
@@ -1052,6 +1611,8 @@ def run_step04_cell_specific_six_sweep_fitting(
             control_aliases = feature_df.loc[control_mask].copy()
             control_aliases["file_id"] = control_aliases["file_id"].astype(str) + "_CONTROL"
             feature_df = pd.concat([feature_df, control_aliases], ignore_index=True)
+        feature_df = _append_ba_feature_id_aliases(feature_df)
+        feature_df = _append_exact_feature_id_aliases(feature_df, STEP02_HISTORICAL_FILE_ID_ALIASES)
     thresholds_df = step02["condition_region_sweep_thresholds"].copy()
     if "feature" in thresholds_df.columns and not set(FEATURE_COLUMNS).issubset(set(thresholds_df["feature"].astype(str))):
         reliability_df = compute_feature_reliability(feature_df)
@@ -1063,8 +1624,7 @@ def run_step04_cell_specific_six_sweep_fitting(
         if cfg.max_cells is not None:
             file_ids = file_ids[: int(cfg.max_cells)]
     else:
-        file_meta = feature_df[["file_id", "condition", "region"]].drop_duplicates().sort_values(["condition", "region", "file_id"])
-        file_ids = file_meta["file_id"].tolist()
+        file_ids = sorted(cell.file_id for cell in load_all_cells(paths["atf_dir"]))
         if cfg.max_cells is not None:
             file_ids = file_ids[: int(cfg.max_cells)]
 
@@ -1073,12 +1633,40 @@ def run_step04_cell_specific_six_sweep_fitting(
     sweep_tables: list[pd.DataFrame] = []
     heldout_tables: list[pd.DataFrame] = []
     summaries: list[dict[str, Any]] = []
-    for file_id in sorted(trace_inventory):
-        cand_df, sweep_df, extra = evaluate_cell_candidates(cfg.project_root, file_id, trace_inventory, feature_df, thresholds_df, cfg)
-        candidate_tables.append(cand_df)
-        sweep_tables.append(sweep_df)
-        heldout_tables.append(extra["heldout"])
-        summaries.append(extra["summary"])
+    resolved_cell_fit_workers = _resolve_cell_fit_workers(cfg.cell_fit_workers, len(trace_inventory))
+    fit_file_ids = sorted(trace_inventory)
+    if resolved_cell_fit_workers == 1:
+        for file_id in fit_file_ids:
+            cand_df, sweep_df, extra = evaluate_cell_candidates(cfg.project_root, file_id, trace_inventory, feature_df, thresholds_df, cfg)
+            candidate_tables.append(cand_df)
+            sweep_tables.append(sweep_df)
+            heldout_tables.append(extra["heldout"])
+            summaries.append(extra["summary"])
+    else:
+        results_by_file_id: dict[str, tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]] = {}
+        tasks = [
+            (cfg.project_root, file_id, trace_inventory[file_id], feature_df, thresholds_df, cfg)
+            for file_id in fit_file_ids
+        ]
+        with ProcessPoolExecutor(max_workers=resolved_cell_fit_workers) as pool:
+            future_to_file_id = {
+                pool.submit(_evaluate_cell_candidates_task, task): task[1]
+                for task in tasks
+            }
+            for future in as_completed(future_to_file_id):
+                file_id = future_to_file_id[future]
+                result_file_id, cand_df, sweep_df, heldout_df, summary = future.result()
+                if result_file_id != file_id:
+                    raise RuntimeError(f"Step 04 worker returned file_id={result_file_id!r}, expected {file_id!r}")
+                results_by_file_id[file_id] = (cand_df, sweep_df, heldout_df, summary)
+        for file_id in fit_file_ids:
+            if file_id not in results_by_file_id:
+                raise RuntimeError(f"Step 04 worker produced no result for file_id={file_id!r}")
+            cand_df, sweep_df, heldout_df, summary = results_by_file_id[file_id]
+            candidate_tables.append(cand_df)
+            sweep_tables.append(sweep_df)
+            heldout_tables.append(heldout_df)
+            summaries.append(summary)
 
     candidates_df = pd.concat(candidate_tables, ignore_index=True) if candidate_tables else pd.DataFrame()
     sweep_metrics_df = pd.concat(sweep_tables, ignore_index=True) if sweep_tables else pd.DataFrame()
@@ -1135,6 +1723,8 @@ def run_step04_cell_specific_six_sweep_fitting(
         "selected_file_ids": sorted(trace_inventory.keys()),
         "n_fit_points": int(cfg.n_fit_points),
         "n_starts": int(cfg.n_starts),
+        "cell_fit_workers": int(resolved_cell_fit_workers),
+        "cell_fit_worker_request": cfg.cell_fit_workers,
         "max_nfev_all6": int(cfg.max_nfev_all6),
         "max_nfev_holdout": int(cfg.max_nfev_holdout),
         "trace_rmse_accept": float(cfg.trace_rmse_accept),
@@ -1150,6 +1740,26 @@ def run_step04_cell_specific_six_sweep_fitting(
         "uses_region_specific_acceptance": True,
         "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only",
     }
+    sqlite_path = _write_step04_sqlite(
+        cfg.output_dir,
+        tables={
+            "cell_fit_candidates": candidates_df,
+            "accepted_cell_ensembles": accepted_df,
+            "cell_fit_quality_summary": summary_df,
+            "heldout_current_screen": heldout_df,
+            "acceptance_contract": contract_df,
+            "candidate_sweep_metrics": sweep_metrics_df,
+            "cell_trace_inventory": inventory_df,
+            "feature_table_by_sweep": feature_df,
+            "condition_region_sweep_thresholds": thresholds_df,
+            "region_condition_cell_counts": cell_counts_df,
+        },
+        metadata={
+            "analysis_summary": analysis_summary,
+            "optimization_config": optimization_config,
+        },
+    )
+    analysis_summary["sqlite_database"] = str(sqlite_path)
     (cfg.output_dir / "analysis_summary.json").write_text(json.dumps(analysis_summary, indent=2), encoding="utf-8")
     write_step04_artifact_manifest(
         cfg.output_dir,

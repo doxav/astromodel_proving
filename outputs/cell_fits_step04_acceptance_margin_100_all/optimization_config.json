@@ -19,22 +19,22 @@
     },
     "trace_weight": 1.0
   },
-  "optimization_config_hash": "5c2634cefdea8e84",
+  "optimization_config_hash": "e61866f5553ad5be",
   "optimizer_config": {
     "allow_optuna_fallback": false,
-    "backend": "optuna_scalar",
+    "backend": "hybrid",
     "candidate_top_k": 500,
     "holdout_backend": "least_squares",
     "hybrid_refine_top_k": 3,
     "hybrid_scipy_post_nfev": 20,
     "hybrid_scipy_pre_nfev": 40,
-    "optuna_n_trials": 2,
-    "optuna_objective": "metric_scalar",
+    "optuna_n_trials": 100,
+    "optuna_objective": "acceptance_margin",
     "optuna_sampler": "tpe",
     "optuna_storage": null,
     "optuna_study_name": null,
     "optuna_timeout_s": null,
-    "run_holdout": false,
+    "run_holdout": true,
     "scipy_f_scale": 1.0,
     "scipy_loss": "linear"
   }

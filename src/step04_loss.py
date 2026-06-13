@@ -11,6 +11,23 @@ import numpy as np
 from .atf_features import FEATURE_COLUMNS
 
 TRACE_LOSS_TYPES = ("L2", "L1", "HUBER", "LOG_COSH", "COMBINED")
+TRACE_TARGET_MODES = ("default", "centered", "centered_scaled")
+TRACE_SHAPE_OPTUNA_OBJECTIVES = tuple(
+    f"trace_shape_{loss_type.lower()}_{target_mode}"
+    for target_mode in TRACE_TARGET_MODES
+    for loss_type in TRACE_LOSS_TYPES
+)
+OPTUNA_OBJECTIVES = (
+    "metric_scalar",
+    "balanced_residual",
+    "acceptance_margin",
+    "trace_shape",
+    "trace_shape_l2",
+    "trace_shape_l1",
+    "trace_shape_huber",
+    "trace_shape_log_cosh",
+    *TRACE_SHAPE_OPTUNA_OBJECTIVES,
+)
 
 FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "all": tuple(FEATURE_COLUMNS),
@@ -98,7 +115,7 @@ class Step04LossConfig:
 
 @dataclass(frozen=True)
 class Step04OptimizerConfig:
-    backend: str = "least_squares"  # least_squares | optuna_scalar | optuna_multi
+    backend: str = "least_squares"  # least_squares | optuna_scalar | optuna_multi | hybrid
 
     scipy_loss: str = "linear"
     scipy_f_scale: float = 1.0
@@ -108,6 +125,12 @@ class Step04OptimizerConfig:
     optuna_sampler: str = "tpe"  # tpe | random | nsga2
     optuna_storage: str | None = None
     optuna_study_name: str | None = None
+    optuna_objective: str = "metric_scalar"
+
+    hybrid_scipy_pre_nfev: int = 40
+    hybrid_scipy_post_nfev: int = 20
+    hybrid_refine_top_k: int = 3
+    candidate_top_k: int = 500
 
     allow_optuna_fallback: bool = False
     run_holdout: bool = True
@@ -117,15 +140,19 @@ class Step04OptimizerConfig:
         backend = str(self.backend).lower()
         if backend == "optuna":
             backend = "optuna_scalar"
-        if backend not in {"least_squares", "optuna_scalar", "optuna_multi"}:
+        if backend in {"scipy_optuna", "scipy_optuna_hybrid"}:
+            backend = "hybrid"
+        if backend not in {"least_squares", "optuna_scalar", "optuna_multi", "hybrid"}:
             raise ValueError(
-                "invalid Step04 optimizer backend; expected least_squares, optuna/optuna_scalar, or optuna_multi"
+                "invalid Step04 optimizer backend; expected least_squares, optuna/optuna_scalar, optuna_multi, or hybrid"
             )
         object.__setattr__(self, "backend", backend)
         if self.holdout_backend != "least_squares":
             raise ValueError("Step 04 holdout_backend currently supports only least_squares")
         if self.optuna_sampler not in {"tpe", "random", "nsga2"}:
             raise ValueError("invalid Optuna sampler; expected tpe, random, or nsga2")
+        if self.optuna_objective not in OPTUNA_OBJECTIVES:
+            raise ValueError(f"invalid Optuna objective; expected one of {OPTUNA_OBJECTIVES}")
         if self.scipy_loss not in {"linear", "soft_l1", "huber", "cauchy", "arctan"}:
             raise ValueError("invalid scipy_loss; expected linear, soft_l1, huber, cauchy, or arctan")
         if not np.isfinite(float(self.scipy_f_scale)) or float(self.scipy_f_scale) <= 0:
@@ -134,6 +161,14 @@ class Step04OptimizerConfig:
             raise ValueError("optuna_n_trials must be >= 1")
         if self.optuna_timeout_s is not None and float(self.optuna_timeout_s) <= 0:
             raise ValueError("optuna_timeout_s must be positive when provided")
+        if int(self.hybrid_scipy_pre_nfev) < 1:
+            raise ValueError("hybrid_scipy_pre_nfev must be >= 1")
+        if int(self.hybrid_scipy_post_nfev) < 1:
+            raise ValueError("hybrid_scipy_post_nfev must be >= 1")
+        if int(self.hybrid_refine_top_k) < 1:
+            raise ValueError("hybrid_refine_top_k must be >= 1")
+        if int(self.candidate_top_k) < 1:
+            raise ValueError("candidate_top_k must be >= 1")
 
         # Use the standard multi-objective sampler unless the caller explicitly requests another.
         if self.backend == "optuna_multi" and self.optuna_sampler == "tpe":

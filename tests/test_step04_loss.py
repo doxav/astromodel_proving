@@ -90,6 +90,27 @@ def test_optimizer_backend_accepts_user_facing_optuna_alias():
     assert cfg.backend == "optuna_scalar"
 
 
+def test_optimizer_backend_accepts_hybrid_aliases():
+    cfg = Step04OptimizerConfig(backend="scipy_optuna_hybrid", hybrid_scipy_pre_nfev=4, hybrid_scipy_post_nfev=2)
+    assert cfg.backend == "hybrid"
+    assert cfg.hybrid_scipy_pre_nfev == 4
+    assert cfg.hybrid_scipy_post_nfev == 2
+    assert cfg.optuna_objective == "metric_scalar"
+
+
+def test_optimizer_config_accepts_smoke_notebook_objective_variants():
+    for objective in (
+        "metric_scalar",
+        "acceptance_margin",
+        "trace_shape_l1_default",
+        "trace_shape_huber_centered",
+        "trace_shape_log_cosh_centered_scaled",
+        "trace_shape_combined_centered_scaled",
+    ):
+        cfg = Step04OptimizerConfig(backend="hybrid", optuna_objective=objective)
+        assert cfg.optuna_objective == objective
+
+
 def test_optimizer_config_rejects_invalid_scipy_loss():
     with pytest.raises(ValueError, match="scipy_loss"):
         Step04OptimizerConfig(scipy_loss="not-a-loss")
@@ -109,6 +130,14 @@ def test_optimizer_config_rejects_invalid_optuna_trial_controls():
         Step04OptimizerConfig(backend="optuna_scalar", optuna_n_trials=0)
     with pytest.raises(ValueError, match="optuna_timeout_s"):
         Step04OptimizerConfig(backend="optuna_scalar", optuna_timeout_s=0)
+    with pytest.raises(ValueError, match="Optuna objective"):
+        Step04OptimizerConfig(backend="hybrid", optuna_objective="bad_objective")
+    with pytest.raises(ValueError, match="hybrid_scipy_pre_nfev"):
+        Step04OptimizerConfig(backend="hybrid", hybrid_scipy_pre_nfev=0)
+    with pytest.raises(ValueError, match="hybrid_scipy_post_nfev"):
+        Step04OptimizerConfig(backend="hybrid", hybrid_scipy_post_nfev=0)
+    with pytest.raises(ValueError, match="candidate_top_k"):
+        Step04OptimizerConfig(backend="hybrid", candidate_top_k=0)
 
 
 def test_config_hash_rejects_non_finite_json_payloads():

@@ -8,6 +8,7 @@
     "acceptance_contract": "acceptance_contract.csv",
     "sweep_metrics": "candidate_sweep_metrics.csv",
     "trace_inventory": "cell_trace_inventory.csv",
+    "sqlite_database": "step04_cell_fits.sqlite",
     "analysis_summary": "analysis_summary.json",
     "optimization_config": "optimization_config.json"
   },
@@ -22,6 +23,8 @@
   ],
   "n_fit_points": 8,
   "n_starts": 1,
+  "cell_fit_workers": 1,
+  "cell_fit_worker_request": 1,
   "max_nfev_all6": 1,
   "max_nfev_holdout": 1,
   "trace_rmse_accept": 18.0,
@@ -30,7 +33,7 @@
   "heldout_pass_accept": 0.3,
   "heldout_min_pass_count": 3,
   "accepted_top_k_per_cell": 3,
-  "optimization_config_hash": "b4c21f3628ccb33b",
+  "optimization_config_hash": "a5c03a18092e5f49",
   "loss_config": {
     "trace": {
       "loss_type": "COMBINED",
@@ -60,11 +63,17 @@
     "optuna_sampler": "tpe",
     "optuna_storage": null,
     "optuna_study_name": null,
+    "optuna_objective": "metric_scalar",
+    "hybrid_scipy_pre_nfev": 40,
+    "hybrid_scipy_post_nfev": 20,
+    "hybrid_refine_top_k": 3,
+    "candidate_top_k": 500,
     "allow_optuna_fallback": false,
     "run_holdout": true,
     "holdout_backend": "least_squares"
   },
   "uses_step02_thresholds": true,
   "uses_region_specific_acceptance": true,
-  "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only"
+  "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only",
+  "sqlite_database": "/home/xav/code/astromodel_proving/outputs/step04_test_downstream_reusable/step04_cell_fits.sqlite"
 }

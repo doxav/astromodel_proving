@@ -19,6 +19,7 @@ STEP04_DOWNSTREAM_ARTIFACTS: dict[str, str] = {
     "acceptance_contract": "acceptance_contract.csv",
     "sweep_metrics": "candidate_sweep_metrics.csv",
     "trace_inventory": "cell_trace_inventory.csv",
+    "sqlite_database": "step04_cell_fits.sqlite",
     "analysis_summary": "analysis_summary.json",
     "optimization_config": "optimization_config.json",
 }

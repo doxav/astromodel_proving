@@ -7,12 +7,13 @@
     "heldout_screen": "heldout_current_screen.csv",
     "optimization_config": "optimization_config.json",
     "quality_summary": "cell_fit_quality_summary.csv",
+    "sqlite_database": "step04_cell_fits.sqlite",
     "sweep_metrics": "candidate_sweep_metrics.csv",
     "trace_inventory": "cell_trace_inventory.csv"
   },
   "missing_artifacts": [],
-  "optimization_config_hash": "5cdde55df9d08ca6",
-  "output_dir": "/workspace/astromodel_proving/outputs/step04_test_optuna_scalar",
+  "optimization_config_hash": "5c2634cefdea8e84",
+  "output_dir": "/home/xav/code/astromodel_proving/outputs/step04_test_optuna_scalar",
   "output_schema_version": "step04_cell_fits_v2",
   "step": "step04"
 }
