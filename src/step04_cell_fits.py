@@ -489,7 +489,14 @@ def _params_from_x(condition: str, x: np.ndarray, seed_source: str, start_label:
 
 def _simulate_sweep(params: Mapping[str, Any], sweep_trace: SweepTrace) -> tuple[np.ndarray, dict[str, Any], float]:
     protocol = {"experiment_type": sweep_trace.condition, "current_na": sweep_trace.current_na, "t_eval_ms": sweep_trace.time_ms_fit}
-    sim = simulate_odeint(params, protocol, z0=DEFAULT_Z0, t_eval_ms=sweep_trace.time_ms_fit, return_hidden=False)
+    sim = simulate_odeint(
+        params,
+        protocol,
+        z0=DEFAULT_Z0,
+        t_eval_ms=sweep_trace.time_ms_fit,
+        return_hidden=False,
+        fail_on_warning=True,
+    )
     sim_vm = np.asarray(sim["Vm"], dtype=float)
     sim_features = extract_features_from_trace(sweep_trace.time_ms_fit / 1000.0, sim_vm)
     onset_s = float(sim_features.get("stim_onset_s", _default_onset_s(sweep_trace.condition)))
@@ -529,8 +536,7 @@ def _residual_vector(x: np.ndarray, condition: str, sweeps_to_fit: Sequence[int]
         residuals.append(np.asarray(trace_resid, dtype=float))
         residuals.append(np.asarray(feature_resid, dtype=float))
         residuals.append(np.asarray(binary_resid, dtype=float))
-    if penalty > 0:
-        residuals.append(np.asarray([penalty], dtype=float))
+    residuals.append(np.asarray([penalty], dtype=float))
     return np.concatenate(residuals).astype(float)
 
 def _score_candidate_metrics(params: Mapping[str, Any], trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, loss_config: Step04LossConfig | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -710,6 +716,7 @@ def _trace_shape_objective_components_from_x(
                 z0=DEFAULT_Z0,
                 t_eval_ms=sweep_trace.time_ms_fit,
                 return_hidden=False,
+                fail_on_warning=True,
             )
             sim_vm = np.asarray(sim["Vm"], dtype=float)
             if not np.isfinite(sim_vm).all():
@@ -1427,7 +1434,14 @@ def build_candidate_overlay_frame(candidate_row: Mapping[str, Any], trace_invent
     rows = []
     for sweep_idx, sweep_trace in sorted(sweeps.items()):
         try:
-            sim = simulate_odeint(params, {"experiment_type": sweep_trace.condition, "current_na": sweep_trace.current_na, "t_eval_ms": sweep_trace.time_ms_fit}, z0=DEFAULT_Z0, t_eval_ms=sweep_trace.time_ms_fit, return_hidden=False)
+            sim = simulate_odeint(
+                params,
+                {"experiment_type": sweep_trace.condition, "current_na": sweep_trace.current_na, "t_eval_ms": sweep_trace.time_ms_fit},
+                z0=DEFAULT_Z0,
+                t_eval_ms=sweep_trace.time_ms_fit,
+                return_hidden=False,
+                fail_on_warning=True,
+            )
             sim_vm = np.asarray(sim["Vm"], dtype=float)
             sim_health = "ok"
         except Exception:

@@ -120,7 +120,7 @@ Feature: local/syncytial split sensitivity is tested
 
 ### Integration
 
-- `analysis/07_assumption_sensitivity.ipynb` executes from the repository root and saves an auditable executed copy.
+- `analysis/07_assumption_sensitivity.ipynb` executes from the repository root.
 - Gating, proxy, and split tables are cross-table coherent by region/condition/candidate.
 
 ### Performance

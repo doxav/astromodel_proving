@@ -113,7 +113,6 @@ A candidate is evaluated with three layers:
 - Support optional historical verified seeds, but do not require them.
 - Save candidate-level, sweep-level, held-out, and cell-level summary tables.
 - Save machine-readable summary JSON.
-- Save an executed notebook under `outputs/executed_notebooks/`.
 
 ## Output files
 
@@ -154,7 +153,7 @@ Required outputs under `outputs/cell_fits/`:
 
 - Step 04 writes the required outputs
 - summary JSON advertises model alignment and Step 02 threshold usage
-- executed notebook exists for audit
+- notebook has been executed for audit
 
 ## Notebook requirements
 

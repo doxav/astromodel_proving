@@ -3,6 +3,7 @@
   "config": {
     "max_candidates": 1,
     "candidate_policy": "best_per_cell",
+    "candidates_per_cell": 3,
     "time_points": 40,
     "t_final_ms": 50000.0,
     "prediction_interval_quantiles": [
@@ -40,8 +41,8 @@
   "n_ppc_rows": 54,
   "n_perturbation_rows": 54,
   "validation_labels": [
-    "insufficient_evidence"
+    "predictive_supported"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 5.760123271000339
+  "elapsed_seconds": 5.85428589899675
 }

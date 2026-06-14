@@ -91,7 +91,7 @@ Feature: mechanism regimes are stress-tested by perturbation
   - PPC rows include `region`, `condition`, `sweep`, `feature`, empirical interval bounds, coverage, and reliability weight.
   - Robustness labels never use `candidate_degenerate_regimes` and downgrade unsupported clusters.
 - Integration:
-  - `analysis/06_predictive_validation_and_perturbation.ipynb` executes from the repository root and saves an executed copy.
+  - `analysis/06_predictive_validation_and_perturbation.ipynb` executes from the repository root.
   - Region/condition/sweep summaries are coherent with candidate-level validation rows.
 - Performance:
   - A one-candidate coarse Step 06 run completes within a practical runtime budget.

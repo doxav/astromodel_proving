@@ -138,24 +138,70 @@ def build_claim_maturity_table(project_root: Path | str) -> pd.DataFrame:
     step06 = _read_csv(root / "outputs" / "predictive_validation" / "robustness_summary.csv")
     step07 = _read_csv(root / "outputs" / "assumption_sensitivity" / "claim_scope_table.csv")
     step08 = _read_csv(root / "outputs" / "parameter_plausibility" / "interpretability_status.csv")
+    phenotype_gate = _read_csv(root / "outputs" / "predictive_validation" / "phenotype_robustness_summary.csv")
+    stratum_gate = _read_csv(root / "outputs" / "reviewer_synthesis" / "stratum_support_gate.csv")
+    assumption_gate = _read_csv(root / "outputs" / "reviewer_synthesis" / "assumption_gate_audit.csv")
+    parameter_class = _read_csv(root / "outputs" / "parameter_plausibility" / "parameter_interpretation_class_audit.csv")
+    restricted_join = _read_csv(root / "outputs" / "reviewer_synthesis" / "restricted_all_gate_join.csv")
 
     predictive_supported = (
         not step06.empty and step06["validation_label"].astype(str).eq("predictive_supported").any()
     )
-    final_after_step08 = (
-        not step08.empty
-        and "final_degeneracy_claim_allowed_after_step08" in step08
-        and step08["final_degeneracy_claim_allowed_after_step08"].astype(bool).any()
-    )
     assumptions_clear = (
         not step07.empty
         and not step07["status"].astype(str).str.contains("needed|insufficient|sensitive|dependent", regex=True).any()
+    )
+    if not assumption_gate.empty and "gate_pass" in assumption_gate:
+        assumptions_clear = bool(assumption_gate["gate_pass"].astype(bool).all())
+    phenotype_restricted_support = (
+        not phenotype_gate.empty
+        and "phenotype_support_gate" in phenotype_gate
+        and phenotype_gate["phenotype_support_gate"].astype(str).eq("pass").any()
+    )
+    stratum_restricted_support = (
+        not stratum_gate.empty
+        and "support_status" in stratum_gate
+        and stratum_gate["support_status"].astype(str).isin(
+            {"all_groups_supported", "restricted_supported_groups_only"}
+        ).any()
+    )
+    direct_parameter_rows = (
+        int(parameter_class["physiology_claim_allowed_after_semantic_filter"].astype(bool).sum())
+        if not parameter_class.empty and "physiology_claim_allowed_after_semantic_filter" in parameter_class
+        else 0
+    )
+    effective_parameter_rows = (
+        int(parameter_class["effective_coordinate_claim_allowed_after_semantic_filter"].astype(bool).sum())
+        if not parameter_class.empty and "effective_coordinate_claim_allowed_after_semantic_filter" in parameter_class
+        else 0
+    )
+    restricted_final_supported = (
+        not restricted_join.empty
+        and "restricted_degeneracy_claim_allowed" in restricted_join
+        and restricted_join["restricted_degeneracy_claim_allowed"].astype(bool).any()
     )
     mean_bio_score = (
         float(pd.to_numeric(step06["biological_description_score"], errors="coerce").mean(skipna=True))
         if "biological_description_score" in step06
         else np.nan
     )
+    mechanism_maturity = str(step05_summary.get("cluster_evidence_status", "unresolved"))
+    mechanism_remaining = "requires Step 06 predictive/perturbation support before stronger wording"
+    if phenotype_restricted_support and stratum_restricted_support:
+        mechanism_maturity = "restricted_model_phenotype_support"
+        mechanism_remaining = "biological pathway wording still requires assumption, parameter, and external-validation gates"
+    parameter_maturity = "partial" if not step08.empty else "unresolved"
+    parameter_remaining = "raw coordinates require both range and identifiability support"
+    if not parameter_class.empty:
+        if direct_parameter_rows > 0:
+            parameter_maturity = "restricted_direct_parameter_support"
+            parameter_remaining = "direct parameter wording limited to cited, identifiable semantic classes"
+        elif effective_parameter_rows > 0:
+            parameter_maturity = "effective_coordinate_only"
+            parameter_remaining = "direct physiological parameter wording remains blocked by semantics or identifiability"
+        else:
+            parameter_maturity = "semantic_and_identifiability_blocked"
+            parameter_remaining = "current ranges are guardrails and fitted coordinates are not direct physiological parameters"
     rows = [
         {
             "claim": "accepted cell-specific six-sweep ensembles exist",
@@ -165,9 +211,9 @@ def build_claim_maturity_table(project_root: Path | str) -> pd.DataFrame:
         },
         {
             "claim": "candidate mechanism regimes are biologically interpretable",
-            "maturity": str(step05_summary.get("cluster_evidence_status", "unresolved")),
-            "basis": "Step 05 hidden-current, windowed phenotype, clustering, and geometry outputs",
-            "remaining_requirement": "requires Step 06 predictive/perturbation support before stronger wording",
+            "maturity": mechanism_maturity,
+            "basis": "Step 05 mechanisms plus Step 06 phenotype robustness and Step 09 stratum gates",
+            "remaining_requirement": mechanism_remaining,
         },
         {
             "claim": "mechanism or phenotype labels are predictive under perturbation",
@@ -177,21 +223,21 @@ def build_claim_maturity_table(project_root: Path | str) -> pd.DataFrame:
         },
         {
             "claim": "model assumptions do not drive the conclusion",
-            "maturity": "supported" if assumptions_clear else "model_dependent_or_unresolved",
-            "basis": "Step 07 gating, proxy, and compartment-split sensitivity",
-            "remaining_requirement": "explicit ECS variant or additional data if proxy validity remains limited",
+            "maturity": "supported" if assumptions_clear else "quantified_model_dependent_or_unresolved",
+            "basis": "Step 07 sensitivity plus explicit Step 09 assumption gate audit",
+            "remaining_requirement": "explicit ECS variant or additional data remains required while the proxy gate fails",
         },
         {
             "claim": "accepted parameters are physiologically interpretable",
-            "maturity": "partial" if not step08.empty else "unresolved",
-            "basis": "Step 08 range, identifiability, and constrained-projection audit",
-            "remaining_requirement": "raw coordinates require both range and identifiability support",
+            "maturity": parameter_maturity,
+            "basis": "Step 08 range/identifiability plus semantic interpretation-class audit",
+            "remaining_requirement": parameter_remaining,
         },
         {
             "claim": "final biological degeneracy wording is allowed",
-            "maturity": "supported" if final_after_step08 and predictive_supported and assumptions_clear else "not_allowed_yet",
-            "basis": "Integrated Step 03-08 synthesis",
-            "remaining_requirement": "requires mechanism distinction, predictive support, assumption robustness, and parameter plausibility together",
+            "maturity": "restricted_supported" if restricted_final_supported else "not_allowed_yet",
+            "basis": "Integrated Step 03-08 synthesis plus restricted all-gate join",
+            "remaining_requirement": "requires mechanism distinction, predictive support, assumption robustness, parameter plausibility, and K_o endpoint support together",
         },
     ]
     out = pd.DataFrame(rows)
@@ -216,6 +262,29 @@ def build_manuscript_asset_manifest(project_root: Path | str) -> pd.DataFrame:
         ("Step 07", "outputs/assumption_sensitivity/claim_scope_table.csv", "Assumption-sensitivity claim scope"),
         ("Step 08", "outputs/parameter_plausibility/interpretability_status.csv", "Parameter interpretability guardrails"),
         ("Step 09", "outputs/reviewer_synthesis/reviewer_traceability_table.csv", "R1-R7 response map"),
+        ("Selected action 1", "outputs/predictive_validation/phenotype_robustness_summary.csv", "Phenotype robustness by mechanism/stratum"),
+        ("Selected action 1", "outputs/reviewer_synthesis/stratum_support_gate.csv", "Region-condition support gates"),
+        ("Selected action 1", "outputs/predictive_validation/prediction_limited_failure_modes.csv", "Prediction-limited failure decomposition"),
+        ("Selected action 1", "outputs/reviewer_synthesis/assumption_gate_audit.csv", "Assumption pass/fail gate audit"),
+        ("Selected action 1", "outputs/assumption_sensitivity/proxy_exclusion_claim_sensitivity.csv", "Proxy-exclusion claim sensitivity"),
+        ("Selected action 1", "outputs/parameter_plausibility/parameter_semantics_audit.csv", "Parameter semantic-class audit"),
+        ("Selected action 1", "outputs/parameter_plausibility/full_accepted_parameter_audit.csv", "Full accepted ensemble parameter audit"),
+        ("Selected action 1", "outputs/parameter_plausibility/parameter_interpretation_class_audit.csv", "Parameter interpretation-class audit"),
+        ("Selected action 1", "outputs/parameter_plausibility/constrained_failure_modes.csv", "Constrained-screen failure modes"),
+        ("Selected action 1", "outputs/reviewer_synthesis/integrated_degeneracy_gate_matrix.csv", "Integrated degeneracy gate matrix"),
+        ("Selected action 1", "outputs/reviewer_synthesis/degeneracy_level_table.csv", "Degeneracy wording level table"),
+        ("Selected action 1", "outputs/reviewer_synthesis/restricted_validation_claims.csv", "Restricted validation claim wording"),
+        ("Selected action 1", "outputs/reviewer_synthesis/restricted_all_gate_join.csv", "All-gate restricted claim join"),
+        ("Selected action 1", "outputs/predictive_validation/K_o_homeostasis_endpoint_audit.csv", "K_o homeostasis endpoint audit"),
+        ("Selected action 1", "outputs/reviewer_synthesis/claim_to_artifact_ledger.csv", "Claim-to-artifact wording ledger"),
+        ("Selected action 2", "outputs/mechanisms/intercluster_interpolation_acceptance.csv", "Intercluster interpolation feature-contract screen"),
+        ("Selected action 2", "outputs/mechanisms/phenotype_threshold_sensitivity.csv", "Phenotype threshold sensitivity"),
+        ("Selected action 2", "outputs/assumption_sensitivity/all_current_assumption_sensitivity.csv", "All-current assumption sensitivity"),
+        ("Selected action 2", "outputs/parameter_plausibility/cell_specific_identifiability_audit.csv", "Cell-specific accepted-ensemble identifiability audit"),
+        ("Selected action 2", "outputs/parameter_plausibility/parameter_ranges_citation_audit.csv", "Parameter range citation/basis audit"),
+        ("Selected action meta", "outputs/reviewer_synthesis/selected_action_scientific_value_assessment.csv", "Scientific value assessment for selected-action artifacts"),
+        ("Selected action meta", "outputs/reviewer_synthesis/selected_action_results_summary.csv", "Selected-action result summary and upgrade screen"),
+        ("Selected action meta", "outputs/reviewer_synthesis/notebook_update_screen_after_selected_actions.csv", "Notebook rerun/comment update screen after selected actions"),
     ]
     rows = []
     for step, rel_path, purpose in assets:

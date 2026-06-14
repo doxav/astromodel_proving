@@ -128,7 +128,6 @@ Requirements:
 ### Integration tests
 
 - The notebook `analysis/03_combined_identifiability_profiles_fim.ipynb` executes from the repository root.
-- The executed notebook is saved under `outputs/executed_notebooks/`.
 - Notebook execution produces the required Step 03 outputs.
 
 ### Performance/tuning tests
@@ -156,6 +155,6 @@ Create `analysis/03_combined_identifiability_profiles_fim.ipynb` with:
 Step 03 is complete when:
 
 - all Step 03 bootstrap, acceptance, integration, and performance tests pass;
-- the Step 03 notebook has been executed and the executed notebook is committed;
+- the Step 03 notebook has been executed and committed;
 - all outputs listed above are present under `outputs/identifiability/`;
 - no notebook or output text claims biological degeneracy from flat profiles or sloppy FIM modes.

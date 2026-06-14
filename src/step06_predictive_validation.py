@@ -37,6 +37,7 @@ IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
 class Step06Config:
     max_candidates: int | None = None
     candidate_policy: str = "best_per_cell"
+    candidates_per_cell: int = 3
     time_points: int = 80
     t_final_ms: float = 50_000.0
     prediction_interval_quantiles: tuple[float, float, float] = (0.05, 0.5, 0.95)
@@ -102,41 +103,62 @@ def load_mechanism_labels(project_root: Path | str, max_candidates: int | None =
     return df
 
 
+def _candidate_sort(ensemble: pd.DataFrame) -> tuple[list[str], list[bool]]:
+    """Return the stable candidate ranking used by Step 06 scope policies."""
+
+    sort_cols = [
+        c
+        for c in [
+            "file_id",
+            "cell_reviewer_facing",
+            "holdout_mean_pass_fraction",
+            "mean_weighted_pass_fraction",
+            "holdout_mean_rmse_mV",
+            "mean_trace_rmse_mV",
+            "ensemble_rank",
+        ]
+        if c in ensemble.columns
+    ]
+    ascending = [True, False, False, False, True, True, True][: len(sort_cols)]
+    return sort_cols, ascending
+
+
+def _select_step06_candidate_scope(ensemble: pd.DataFrame, config: Step06Config) -> pd.DataFrame:
+    """Apply the configured candidate-scope sensitivity policy."""
+
+    policy = str(config.candidate_policy)
+    valid_policies = {"all", "best_per_cell", "top_k_per_cell", "mechanism_diverse_per_cell"}
+    if policy not in valid_policies:
+        raise ValueError(f"candidate_policy must be one of {sorted(valid_policies)}")
+    if ensemble.empty or policy == "all":
+        return ensemble.copy()
+    candidates_per_cell = int(config.candidates_per_cell)
+    if candidates_per_cell < 1:
+        raise ValueError("candidates_per_cell must be >= 1")
+    k = 1 if policy == "best_per_cell" else candidates_per_cell
+    sort_cols, ascending = _candidate_sort(ensemble)
+    ranked = ensemble.sort_values(sort_cols, ascending=ascending).reset_index(drop=True)
+    if policy in {"best_per_cell", "top_k_per_cell"}:
+        return ranked.groupby("file_id", as_index=False, dropna=False).head(k).reset_index(drop=True)
+
+    if "mechanism_cluster" not in ranked.columns:
+        ranked = ranked.assign(mechanism_cluster="unlabeled")
+    diverse = (
+        ranked.groupby(["file_id", "mechanism_cluster"], as_index=False, dropna=False)
+        .head(1)
+        .reset_index(drop=True)
+    )
+    sort_cols, ascending = _candidate_sort(diverse)
+    return (
+        diverse.sort_values(sort_cols, ascending=ascending)
+        .groupby("file_id", as_index=False, dropna=False)
+        .head(k)
+        .reset_index(drop=True)
+    )
+
+
 def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     ensemble, _ = load_step04_accepted_ensemble(project_root, max_candidates=None)
-    if config.candidate_policy not in {"all", "best_per_cell"}:
-        raise ValueError("candidate_policy must be 'all' or 'best_per_cell'")
-    if config.candidate_policy == "best_per_cell" and not ensemble.empty:
-        sort_cols = [
-            c
-            for c in [
-                "file_id",
-                "cell_reviewer_facing",
-                "holdout_mean_pass_fraction",
-                "mean_weighted_pass_fraction",
-                "holdout_mean_rmse_mV",
-                "mean_trace_rmse_mV",
-                "ensemble_rank",
-            ]
-            if c in ensemble.columns
-        ]
-        ascending = [
-            True,
-            False,
-            False,
-            False,
-            True,
-            True,
-            True,
-        ][: len(sort_cols)]
-        ensemble = (
-            ensemble.sort_values(sort_cols, ascending=ascending)
-            .groupby("file_id", as_index=False, dropna=False)
-            .head(1)
-            .reset_index(drop=True)
-        )
-    if config.max_candidates is not None:
-        ensemble = ensemble.sort_values(IDENTITY_COLUMNS).head(int(config.max_candidates)).copy()
     mechanisms = load_mechanism_labels(project_root, max_candidates=None)
     keep_cols = [
         c
@@ -166,6 +188,9 @@ def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[
     merged["cluster_claim_scope"] = merged.get("cluster_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_label")
     merged["buffering_phenotype"] = merged.get("buffering_phenotype", pd.Series(index=merged.index, dtype=object)).fillna("unlabeled")
     merged["phenotype_claim_scope"] = merged.get("phenotype_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_phenotype")
+    merged = _select_step06_candidate_scope(merged, config)
+    if config.max_candidates is not None:
+        merged = merged.sort_values(IDENTITY_COLUMNS).head(int(config.max_candidates)).copy()
     return merged, mechanisms
 
 

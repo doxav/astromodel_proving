@@ -3,6 +3,7 @@
   "config": {
     "max_candidates": null,
     "candidate_policy": "best_per_cell",
+    "candidates_per_cell": 3,
     "time_points": 50,
     "t_final_ms": 50000.0,
     "prediction_interval_quantiles": [
@@ -34,15 +35,15 @@
     "require_candidate_level_heldout": true,
     "final_degeneracy_claim_allowed": false
   },
-  "n_candidates": 30,
-  "n_heldout_rows": 240,
-  "n_prediction_interval_rows": 323,
+  "n_candidates": 35,
+  "n_heldout_rows": 280,
+  "n_prediction_interval_rows": 324,
   "n_ppc_rows": 324,
-  "n_perturbation_rows": 1620,
+  "n_perturbation_rows": 1890,
   "validation_labels": [
     "prediction_limited",
     "predictive_supported"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 65.90901539400147
+  "elapsed_seconds": 58.3905487660013
 }

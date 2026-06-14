@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
-from src.step06_predictive_validation import Step06Config, run_step06_predictive_validation
+import pytest
+
+from src.step06_predictive_validation import Step06Config, load_step06_inputs, run_step06_predictive_validation
 
 
 def test_step06_writes_required_outputs_and_conservative_labels(project_root):
@@ -88,6 +90,37 @@ def test_step06_missing_step05_labels_are_explicit(project_root):
     assert heldout["mechanism_label_status"].isin(
         {"step05_label_available", "missing_step05_label"}
     ).all()
+
+
+def test_step06_top_k_candidate_policy_limits_candidates_per_cell(project_root):
+    candidates, _ = load_step06_inputs(
+        project_root,
+        Step06Config(candidate_policy="top_k_per_cell", candidates_per_cell=2),
+    )
+
+    per_cell_counts = candidates.groupby("file_id", dropna=False).size()
+    assert per_cell_counts.le(2).all()
+    assert per_cell_counts.gt(1).any()
+
+
+def test_step06_mechanism_diverse_policy_uses_one_candidate_per_cell_mechanism(project_root):
+    candidates, _ = load_step06_inputs(
+        project_root,
+        Step06Config(candidate_policy="mechanism_diverse_per_cell", candidates_per_cell=3),
+    )
+
+    per_cell_counts = candidates.groupby("file_id", dropna=False).size()
+    per_cell_mechanism_counts = candidates.groupby(["file_id", "mechanism_cluster"], dropna=False).size()
+    assert per_cell_counts.le(3).all()
+    assert per_cell_mechanism_counts.le(1).all()
+
+
+def test_step06_candidate_policy_rejects_invalid_k(project_root):
+    with pytest.raises(ValueError, match="candidates_per_cell"):
+        load_step06_inputs(
+            project_root,
+            Step06Config(candidate_policy="top_k_per_cell", candidates_per_cell=0),
+        )
 
 
 def test_step06_final_degeneracy_claim_is_never_enabled_by_default(project_root):

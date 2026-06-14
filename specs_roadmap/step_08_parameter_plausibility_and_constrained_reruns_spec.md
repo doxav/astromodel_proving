@@ -130,7 +130,7 @@ Feature: constrained inference tests whether claims depend on implausible parame
 
 - Candidate-level interpretability summaries are coherent with parameter-level audit rows by `file_id`, `region`, `condition`, and `candidate_id`.
 - Constrained-rerun comparison contains one row per requested current, changed-parameter provenance, flux-based mechanism-change fields, and conservative claim-persistence statuses.
-- `analysis/08_parameter_plausibility_and_constrained_reruns.ipynb` executes from the repository root and saves an auditable executed copy.
+- `analysis/08_parameter_plausibility_and_constrained_reruns.ipynb` executes from the repository root.
 
 ### Performance
 

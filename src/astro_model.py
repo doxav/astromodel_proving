@@ -7,6 +7,7 @@ without carrying the original notebook scaffolding.
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional, Sequence
@@ -14,8 +15,9 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 import numpy as np
 
 try:
-    from scipy.integrate import odeint
+    from scipy.integrate import ODEintWarning, odeint
 except Exception as exc:  # pragma: no cover
+    ODEintWarning = Warning  # type: ignore[assignment]
     odeint = None  # type: ignore[assignment]
     _SCIPY_IMPORT_ERROR = exc
 else:  # pragma: no cover
@@ -41,6 +43,10 @@ EXPERIMENT_K_BATH_TIME: Dict[str, list[float]] = {
 
 DEFAULT_T_FINAL_MS = 50_000.0
 DEFAULT_DT_MS = 0.1
+
+
+class ODESolverWarningError(ValueError):
+    """Raised when a captured ODE solver warning is configured as fatal."""
 
 
 @dataclass(frozen=True)
@@ -295,7 +301,28 @@ def _collect_hidden_outputs(t_ms: np.ndarray, states: np.ndarray, params: Mappin
     return {"currents": currents, "derived": derived, "effective_params": effective_params}
 
 
-def simulate_odeint(params: Mapping[str, Any], protocol: Mapping[str, Any], z0: Optional[Sequence[float]] = None, t_eval_ms: Optional[Sequence[float]] = None, return_hidden: bool = False) -> Dict[str, Any]:
+def _odeint_warning_messages(caught_warnings: Sequence[Any]) -> list[str]:
+    """Return stable messages from captured scipy odeint warnings."""
+
+    messages: list[str] = []
+    for warning_record in caught_warnings:
+        if not issubclass(warning_record.category, ODEintWarning):
+            continue
+        message = str(warning_record.message)
+        if message not in messages:
+            messages.append(message)
+    return messages
+
+
+def simulate_odeint(
+    params: Mapping[str, Any],
+    protocol: Mapping[str, Any],
+    z0: Optional[Sequence[float]] = None,
+    t_eval_ms: Optional[Sequence[float]] = None,
+    return_hidden: bool = False,
+    *,
+    fail_on_warning: bool = False,
+) -> Dict[str, Any]:
     if odeint is None:  # pragma: no cover
         raise ImportError("scipy.integrate.odeint is required") from _SCIPY_IMPORT_ERROR
     paramdict = _ensure_paramdict(params, protocol)
@@ -308,9 +335,19 @@ def simulate_odeint(params: Mapping[str, Any], protocol: Mapping[str, Any], z0: 
             dt = float(protocol.get("dt_ms", DEFAULT_DT_MS))
             t_eval_ms = np.arange(0.0, t_final + dt, dt, dtype=float)
     t_arr = np.asarray(t_eval_ms, dtype=float)
-    states = odeint(_rhs_for_odeint, z0_arr, t_arr, args=(paramdict,))
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always", ODEintWarning)
+        states = odeint(_rhs_for_odeint, z0_arr, t_arr, args=(paramdict,))
+    warning_messages = _odeint_warning_messages(caught_warnings)
+    if warning_messages and fail_on_warning:
+        raise ODESolverWarningError(f"ODE solver warning: {'; '.join(warning_messages)}")
     if not np.isfinite(states).all():
         raise ValueError("Non-finite values detected in ODE solution")
+    numerical_health = {
+        "status": "warning" if warning_messages else "ok",
+        "odeint_warning_count": int(len(warning_messages)),
+        "odeint_warning_messages": warning_messages,
+    }
     out: Dict[str, Any] = {
         "t_ms": t_arr,
         "states": states,
@@ -318,6 +355,7 @@ def simulate_odeint(params: Mapping[str, Any], protocol: Mapping[str, Any], z0: 
         "params": paramdict,
         "protocol": dict(protocol),
         "solver": "odeint",
+        "numerical_health": numerical_health,
     }
     if return_hidden:
         hidden = _collect_hidden_outputs(t_arr, states, paramdict)

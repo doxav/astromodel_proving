@@ -16,7 +16,7 @@
   "implementation_mode": "shared-cell least-squares fitting with multi-start and leave-one-sweep-out validation",
   "n_cells": 1,
   "n_candidates": 2,
-  "n_accepted_candidates": 1,
+  "n_accepted_candidates": 0,
   "n_reviewer_facing_cells": 0,
   "selected_file_ids": [
     "1_DH_1_CONTROL"

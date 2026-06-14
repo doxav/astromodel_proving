@@ -165,7 +165,7 @@ Feature: mechanism regimes are summarized by brain region
   - Representatives are Step 04 accepted/reviewer-facing candidates.
   - Claim-scope statuses remain conservative before Step 06.
 - Integration tests:
-  - The notebook `analysis/05_mechanistic_decomposition.ipynb` executes from repository root and saves an executed copy.
+  - The notebook `analysis/05_mechanistic_decomposition.ipynb` executes from repository root.
   - Region/condition enrichment and geometry classification are coherent with cluster outputs.
 - Performance tests:
   - A small Step 05 run over the cached Step 04 demo ensemble finishes within a practical runtime budget.

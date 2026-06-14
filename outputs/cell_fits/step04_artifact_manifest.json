@@ -13,7 +13,13 @@
   },
   "missing_artifacts": [],
   "optimization_config_hash": "e61866f5553ad5be",
-  "output_dir": "/home/xav/code/astromodel_proving/outputs/cell_fits_step04_acceptance_margin_100_all",
+  "optimization_config_hashes_present": [
+    "1710e98be83bf964",
+    "e50e4e6c65dca5fd",
+    "e61866f5553ad5be"
+  ],
+  "output_dir": "/home/xav/code/astromodel_proving/outputs/cell_fits",
   "output_schema_version": "step04_cell_fits_v2",
-  "step": "step04"
+  "step": "step04",
+  "targeted_merge_manifest": "targeted_step04_merge_manifest.csv"
 }
