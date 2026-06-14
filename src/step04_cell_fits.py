@@ -17,6 +17,10 @@ from .astro_model import DEFAULT_Z0, normalize_trace_for_target_mode, simulate_o
 from .atf_io import load_all_cells, load_cell_protocol, canonical_file_id
 from .atf_features import FEATURE_COLUMNS, build_feature_table, compute_feature_reliability, build_threshold_table, extract_features_from_trace
 from .feature_contracts import feature_residual_vector, score_feature_contract
+from .effective_candidate_selection import (
+    select_effective_diverse_candidates,
+    summarize_effective_diverse_selection,
+)
 from .parameter_space import effective_from_flat, flat_from_effective
 from .protocols import default_onset_seconds
 from .trace_utils import baseline_center, downsample_trace
@@ -44,6 +48,9 @@ HELDOUT_TRACE_RMSE_ACCEPT_DEFAULT = 20.0
 HELDOUT_PASS_ACCEPT_DEFAULT = 0.30
 HELDOUT_MIN_PASS_COUNT_DEFAULT = 3
 ACCEPTED_TOP_K_PER_CELL_DEFAULT = 3
+EFFECTIVE_DIVERSE_CANDIDATES_PER_CELL_DEFAULT = 3
+EFFECTIVE_DIVERSE_SELECTION_STRATEGY_DEFAULT = "quality_filtered_effective_maximin"
+EFFECTIVE_DIVERSE_DISTANCE_THRESHOLD_DEFAULT = 0.5
 N_FIT_POINTS_DEFAULT = 40
 N_STARTS_DEFAULT = 3
 MAX_NFEV_ALL6_DEFAULT = 60
@@ -108,6 +115,9 @@ class Step04Config:
     heldout_pass_accept: float = HELDOUT_PASS_ACCEPT_DEFAULT
     heldout_min_pass_count: int = HELDOUT_MIN_PASS_COUNT_DEFAULT
     accepted_top_k_per_cell: int = ACCEPTED_TOP_K_PER_CELL_DEFAULT
+    effective_diverse_candidates_per_cell: int = EFFECTIVE_DIVERSE_CANDIDATES_PER_CELL_DEFAULT
+    effective_diverse_selection_strategy: str = EFFECTIVE_DIVERSE_SELECTION_STRATEGY_DEFAULT
+    effective_diverse_distance_threshold: float = EFFECTIVE_DIVERSE_DISTANCE_THRESHOLD_DEFAULT
     loss_config: Step04LossConfig = field(default_factory=Step04LossConfig)
     optimizer_config: Step04OptimizerConfig = field(default_factory=Step04OptimizerConfig)
     cell_fit_workers: int | str = 1
@@ -121,6 +131,11 @@ class Step04Config:
                 raise ValueError("cell_fit_workers must be a positive integer or 'auto'")
         elif int(self.cell_fit_workers) < 1:
             raise ValueError("cell_fit_workers must be >= 1")
+        if int(self.effective_diverse_candidates_per_cell) < 1:
+            raise ValueError("effective_diverse_candidates_per_cell must be >= 1")
+        effective_threshold = float(self.effective_diverse_distance_threshold)
+        if not np.isfinite(effective_threshold) or effective_threshold < 0:
+            raise ValueError("effective_diverse_distance_threshold must be finite and non-negative")
         return self
 
 
@@ -1557,6 +1572,9 @@ def run_step04_cell_specific_six_sweep_fitting(
     heldout_pass_accept: float = HELDOUT_PASS_ACCEPT_DEFAULT,
     heldout_min_pass_count: int = HELDOUT_MIN_PASS_COUNT_DEFAULT,
     accepted_top_k_per_cell: int = ACCEPTED_TOP_K_PER_CELL_DEFAULT,
+    effective_diverse_candidates_per_cell: int = EFFECTIVE_DIVERSE_CANDIDATES_PER_CELL_DEFAULT,
+    effective_diverse_selection_strategy: str = EFFECTIVE_DIVERSE_SELECTION_STRATEGY_DEFAULT,
+    effective_diverse_distance_threshold: float = EFFECTIVE_DIVERSE_DISTANCE_THRESHOLD_DEFAULT,
     reuse_step02_outputs: bool = True,
     loss_config: Step04LossConfig | None = None,
     optimizer_config: Step04OptimizerConfig | None = None,
@@ -1601,6 +1619,9 @@ def run_step04_cell_specific_six_sweep_fitting(
         heldout_pass_accept=heldout_pass_accept,
         heldout_min_pass_count=heldout_min_pass_count,
         accepted_top_k_per_cell=accepted_top_k_per_cell,
+        effective_diverse_candidates_per_cell=effective_diverse_candidates_per_cell,
+        effective_diverse_selection_strategy=effective_diverse_selection_strategy,
+        effective_diverse_distance_threshold=effective_diverse_distance_threshold,
         loss_config=base_loss_config,
         optimizer_config=base_optimizer_config,
         cell_fit_workers=cell_fit_workers,
@@ -1710,6 +1731,20 @@ def run_step04_cell_specific_six_sweep_fitting(
                     candidates_df[col] = candidates_df[summary_col].combine_first(candidates_df[col])
                     candidates_df = candidates_df.drop(columns=[summary_col])
     accepted_df = candidates_df[candidates_df["accepted_all6"]].copy().reset_index(drop=True) if (not candidates_df.empty and "accepted_all6" in candidates_df.columns) else pd.DataFrame()
+    effective_diverse_df = (
+        select_effective_diverse_candidates(
+            accepted_df,
+            candidates_per_cell=cfg.effective_diverse_candidates_per_cell,
+            strategy=cfg.effective_diverse_selection_strategy,
+            distance_threshold=cfg.effective_diverse_distance_threshold,
+        )
+        if not accepted_df.empty
+        else pd.DataFrame()
+    )
+    effective_diverse_summary_df = summarize_effective_diverse_selection(
+        effective_diverse_df,
+        distance_threshold=cfg.effective_diverse_distance_threshold,
+    )
     contract_df = acceptance_contract_table(cfg)
     inventory_df = pd.DataFrame([
         {"file_id": fid, "region": next(iter(sweeps.values())).region, "condition": next(iter(sweeps.values())).condition, "n_sweeps": len(sweeps)}
@@ -1719,6 +1754,8 @@ def run_step04_cell_specific_six_sweep_fitting(
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
     candidates_df.to_csv(cfg.output_dir / "cell_fit_candidates.csv", index=False)
     accepted_df.to_csv(cfg.output_dir / "accepted_cell_ensembles.csv", index=False)
+    effective_diverse_df.to_csv(cfg.output_dir / "effective_diverse_cell_ensembles.csv", index=False)
+    effective_diverse_summary_df.to_csv(cfg.output_dir / "effective_diverse_selection_summary.csv", index=False)
     summary_df.to_csv(cfg.output_dir / "cell_fit_quality_summary.csv", index=False)
     heldout_df.to_csv(cfg.output_dir / "heldout_current_screen.csv", index=False)
     contract_df.to_csv(cfg.output_dir / "acceptance_contract.csv", index=False)
@@ -1733,6 +1770,7 @@ def run_step04_cell_specific_six_sweep_fitting(
         "n_cells": int(len(inventory_df)),
         "n_candidates": int(len(candidates_df)),
         "n_accepted_candidates": int(len(accepted_df)),
+        "n_effective_diverse_candidates": int(len(effective_diverse_df)),
         "n_reviewer_facing_cells": int(summary_df["cell_reviewer_facing"].sum()) if not summary_df.empty else 0,
         "selected_file_ids": sorted(trace_inventory.keys()),
         "n_fit_points": int(cfg.n_fit_points),
@@ -1747,6 +1785,9 @@ def run_step04_cell_specific_six_sweep_fitting(
         "heldout_pass_accept": float(cfg.heldout_pass_accept),
         "heldout_min_pass_count": int(cfg.heldout_min_pass_count),
         "accepted_top_k_per_cell": int(cfg.accepted_top_k_per_cell),
+        "effective_diverse_candidates_per_cell": int(cfg.effective_diverse_candidates_per_cell),
+        "effective_diverse_selection_strategy": str(cfg.effective_diverse_selection_strategy),
+        "effective_diverse_distance_threshold": float(cfg.effective_diverse_distance_threshold),
         "optimization_config_hash": optimization_config["optimization_config_hash"],
         "loss_config": optimization_config["loss_config"],
         "optimizer_config": optimization_config["optimizer_config"],
@@ -1759,6 +1800,8 @@ def run_step04_cell_specific_six_sweep_fitting(
         tables={
             "cell_fit_candidates": candidates_df,
             "accepted_cell_ensembles": accepted_df,
+            "effective_diverse_cell_ensembles": effective_diverse_df,
+            "effective_diverse_selection_summary": effective_diverse_summary_df,
             "cell_fit_quality_summary": summary_df,
             "heldout_current_screen": heldout_df,
             "acceptance_contract": contract_df,
@@ -1783,6 +1826,8 @@ def run_step04_cell_specific_six_sweep_fitting(
     return {
         "cell_fit_candidates": candidates_df,
         "accepted_cell_ensembles": accepted_df,
+        "effective_diverse_cell_ensembles": effective_diverse_df,
+        "effective_diverse_selection_summary": effective_diverse_summary_df,
         "cell_fit_quality_summary": summary_df,
         "heldout_current_screen": heldout_df,
         "acceptance_contract": contract_df,

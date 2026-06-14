@@ -36,6 +36,7 @@ IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
 @dataclass(slots=True)
 class Step06Config:
     max_candidates: int | None = None
+    step04_source_path: str | None = None
     candidate_policy: str = "best_per_cell"
     candidates_per_cell: int = 3
     time_points: int = 80
@@ -158,7 +159,11 @@ def _select_step06_candidate_scope(ensemble: pd.DataFrame, config: Step06Config)
 
 
 def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[pd.DataFrame, pd.DataFrame]:
-    ensemble, _ = load_step04_accepted_ensemble(project_root, max_candidates=None)
+    ensemble, _ = load_step04_accepted_ensemble(
+        project_root,
+        source_path=config.step04_source_path,
+        max_candidates=None,
+    )
     mechanisms = load_mechanism_labels(project_root, max_candidates=None)
     keep_cols = [
         c

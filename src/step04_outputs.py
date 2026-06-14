@@ -14,6 +14,8 @@ STEP04_ENV_PREFIX = "ASTROMODEL_STEP04_"
 STEP04_DOWNSTREAM_ARTIFACTS: dict[str, str] = {
     "candidates": "cell_fit_candidates.csv",
     "accepted_ensembles": "accepted_cell_ensembles.csv",
+    "effective_diverse_ensembles": "effective_diverse_cell_ensembles.csv",
+    "effective_diverse_selection_summary": "effective_diverse_selection_summary.csv",
     "quality_summary": "cell_fit_quality_summary.csv",
     "heldout_screen": "heldout_current_screen.csv",
     "acceptance_contract": "acceptance_contract.csv",

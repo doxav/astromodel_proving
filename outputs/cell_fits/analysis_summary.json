@@ -3,6 +3,8 @@
   "downstream_artifacts": {
     "candidates": "cell_fit_candidates.csv",
     "accepted_ensembles": "accepted_cell_ensembles.csv",
+    "effective_diverse_ensembles": "effective_diverse_cell_ensembles.csv",
+    "effective_diverse_selection_summary": "effective_diverse_selection_summary.csv",
     "quality_summary": "cell_fit_quality_summary.csv",
     "heldout_screen": "heldout_current_screen.csv",
     "acceptance_contract": "acceptance_contract.csv",
@@ -261,5 +263,9 @@
         }
       }
     }
-  }
+  },
+  "n_effective_diverse_candidates": 97,
+  "effective_diverse_candidates_per_cell": 3,
+  "effective_diverse_selection_strategy": "quality_filtered_effective_maximin",
+  "effective_diverse_distance_threshold": 0.5
 }

@@ -29,11 +29,19 @@ def test_single_control_cell_fit_writes_expected_outputs(project_root):
     res = run_step04_cell_specific_six_sweep_fitting(project_root, output_dir=out, selected_file_ids=['1_DH_1_CONTROL'], max_cells=1, n_fit_points=10, n_starts=1, max_nfev_all6=1, max_nfev_holdout=1)
     assert (out / 'cell_fit_candidates.csv').exists()
     assert (out / 'accepted_cell_ensembles.csv').exists()
+    assert (out / 'effective_diverse_cell_ensembles.csv').exists()
+    assert (out / 'effective_diverse_selection_summary.csv').exists()
     sqlite_path = out / 'step04_cell_fits.sqlite'
     assert sqlite_path.exists()
     with sqlite3.connect(sqlite_path) as con:
         tables = {row[0] for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"cell_fit_candidates", "candidate_sweep_metrics", "run_metadata"}.issubset(tables)
+        assert {
+            "cell_fit_candidates",
+            "candidate_sweep_metrics",
+            "effective_diverse_cell_ensembles",
+            "effective_diverse_selection_summary",
+            "run_metadata",
+        }.issubset(tables)
         n_candidate_rows = con.execute("SELECT COUNT(*) FROM cell_fit_candidates").fetchone()[0]
         n_sweep_rows = con.execute("SELECT COUNT(*) FROM candidate_sweep_metrics").fetchone()[0]
     assert n_candidate_rows == len(res['cell_fit_candidates'])
@@ -45,6 +53,7 @@ def test_single_control_cell_fit_writes_expected_outputs(project_root):
     assert optimization_config['optimization_config_hash']
     assert 'scalar_objective' in res['cell_fit_candidates'].columns
     assert 'objective_trace' in res['cell_fit_candidates'].columns
+    assert 'effective_selection_strategy' in res['effective_diverse_cell_ensembles'].columns
     assert set(res['cell_fit_candidates']['optimization_config_hash']) == {optimization_config['optimization_config_hash']}
     assert len(res['heldout_current_screen']) == 6
 

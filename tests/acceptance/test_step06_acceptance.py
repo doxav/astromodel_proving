@@ -115,6 +115,24 @@ def test_step06_mechanism_diverse_policy_uses_one_candidate_per_cell_mechanism(p
     assert per_cell_mechanism_counts.le(1).all()
 
 
+def test_step06_can_read_effective_diverse_step04_source(project_root):
+    source_path = project_root / "outputs" / "cell_fits" / "effective_diverse_cell_ensembles.csv"
+    if not source_path.exists():
+        pytest.skip("effective-diverse Step 04 artifact is not present")
+
+    candidates, _ = load_step06_inputs(
+        project_root,
+        Step06Config(
+            step04_source_path="outputs/cell_fits/effective_diverse_cell_ensembles.csv",
+            candidate_policy="all",
+        ),
+    )
+
+    assert not candidates.empty
+    assert "effective_selection_strategy" in candidates.columns
+    assert candidates.groupby("file_id", dropna=False).size().le(3).all()
+
+
 def test_step06_candidate_policy_rejects_invalid_k(project_root):
     with pytest.raises(ValueError, match="candidates_per_cell"):
         load_step06_inputs(

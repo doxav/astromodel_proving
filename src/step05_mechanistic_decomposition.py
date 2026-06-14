@@ -59,6 +59,7 @@ class Step05Config:
     while retaining all six canonical current sweeps.
     """
 
+    step04_source_path: str | None = None
     max_candidates: int | None = None
     time_points: int = 180
     t_final_ms: float = 50_000.0
@@ -106,11 +107,11 @@ def load_step04_accepted_ensemble(
         / "step04_cell_specific_multisweep"
         / "accepted_candidates.csv",
     ]
-    path = (
-        Path(source_path).resolve()
-        if source_path is not None
-        else next((p for p in candidates if p.exists()), candidates[0])
-    )
+    if source_path is not None:
+        requested_path = Path(source_path)
+        path = (requested_path if requested_path.is_absolute() else root / requested_path).resolve()
+    else:
+        path = next((p for p in candidates if p.exists()), candidates[0])
     if not path.exists():
         raise FileNotFoundError(f"Step 04 accepted ensemble not found: {path}")
 
@@ -811,7 +812,9 @@ def run_step05_mechanistic_decomposition(
     t0 = time.perf_counter()
 
     ensemble, source_path = load_step04_accepted_ensemble(
-        root, max_candidates=config.max_candidates
+        root,
+        source_path=config.step04_source_path,
+        max_candidates=config.max_candidates,
     )
     sweep_tables: list[pd.DataFrame] = []
     windowed_tables: list[pd.DataFrame] = []

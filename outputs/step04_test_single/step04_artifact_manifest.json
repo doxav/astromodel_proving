@@ -4,6 +4,8 @@
     "accepted_ensembles": "accepted_cell_ensembles.csv",
     "analysis_summary": "analysis_summary.json",
     "candidates": "cell_fit_candidates.csv",
+    "effective_diverse_ensembles": "effective_diverse_cell_ensembles.csv",
+    "effective_diverse_selection_summary": "effective_diverse_selection_summary.csv",
     "heldout_screen": "heldout_current_screen.csv",
     "optimization_config": "optimization_config.json",
     "quality_summary": "cell_fit_quality_summary.csv",
