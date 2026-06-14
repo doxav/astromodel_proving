@@ -1,0 +1,21 @@
+# Python and notebook local cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Archived or superseded local outputs
+outputs_old/
+
+# Local benchmark, exploratory, and test-run outputs
+outputs/*.zip
+outputs/cell_fits_step04_acceptance_margin_100_all_notebook/
+outputs/cell_fits_step04_hybrid_*/
+outputs/step04_hybrid_timing_one_cell/
+outputs/step04_objective100_hybrid_confirm_12cell/
+outputs/step04_objective100_screen/
+outputs/step04_objective_bench_*/
+outputs/step04_parallel_bench_workers_*/
+outputs/step04_test_*/
+outputs/step05_acceptance/
+outputs/step09_acceptance/

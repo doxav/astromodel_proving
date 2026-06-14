@@ -1,0 +1,7 @@
+claim,maturity,basis,remaining_requirement,mean_biological_description_score
+accepted cell-specific six-sweep ensembles exist,supported,Step 04 accepted ensemble and held-out-current artifacts,increase accepted/reviewer-facing cell coverage if strata remain sparse,0.6572248423051184
+candidate mechanism regimes are biologically interpretable,candidate_regime_screen,"Step 05 hidden-current, windowed phenotype, clustering, and geometry outputs",requires Step 06 predictive/perturbation support before stronger wording,0.6572248423051184
+mechanism or phenotype labels are predictive under perturbation,supported,Step 06 robustness labels and biological_description_score,"broaden support across region, condition, mechanism clusters, and all accepted cells",0.6572248423051184
+model assumptions do not drive the conclusion,model_dependent_or_unresolved,"Step 07 gating, proxy, and compartment-split sensitivity",explicit ECS variant or additional data if proxy validity remains limited,0.6572248423051184
+accepted parameters are physiologically interpretable,partial,"Step 08 range, identifiability, and constrained-projection audit",raw coordinates require both range and identifiability support,0.6572248423051184
+final biological degeneracy wording is allowed,not_allowed_yet,Integrated Step 03-08 synthesis,"requires mechanism distinction, predictive support, assumption robustness, and parameter plausibility together",0.6572248423051184

@@ -1,7 +1,7 @@
 file_id,region,condition,candidate_id,current_na,sweep,gating_family,identical_contract_id,mechanism_cluster,dominant_mechanism,holdout_pass_fraction,mean_trace_rmse_mV_step04,simulation_status,failure_reason,trace_rmse_vs_sigmoid_mV,family_supported_under_same_contract,mechanism_claim_stable
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,sigmoid,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,0.0,True,False
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,tanh,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,0.0035018369134766562,True,False
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,hill,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,0.009405028539773859,True,False
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,soft_threshold,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,0.009314413162626536,True,False
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,hard_threshold,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,0.009421315765889539,True,False
-1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,double_sigmoid,step07_same_candidates_currents_timegrid_loss_v1,unlabeled,unknown,0.3554932611877501,3.5542669849008157,ok,,1.376482764134417,True,False
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,0.0,True,True
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,tanh,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,0.0035018504303474494,True,True
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,hill,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,0.009405036722283641,True,True
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,soft_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,0.009314422708421359,True,True
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,hard_threshold,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,0.009421321108017093,True,True
+1_DH_1_CONTROL,DH,CONTROL,1_DH_1_CONTROL__cand_01,100,3,double_sigmoid,step07_same_candidates_currents_timegrid_loss_v1,M1,Mixed,0.3554932611877501,3.5542669849008157,ok,,1.376483210341325,True,True

@@ -1,0 +1,11 @@
+measure_family,measure,status,rationale
+state reconstruction,"Vm, K_o, DK_a, DK_t, K_s, currents",primary,Hidden-state reconstruction is retained for mechanism interpretation and simulation sanity checks.
+signed flux budget,"local load, spatial export, bath source/sink",primary,Signed local/spatial budgets distinguish local uptake from long-range redistribution.
+mechanistic mode,D_F and D_I_elec with finite dominance margin,primary,Continuous local/spatial axes are primary; labels are derived summaries.
+recruitment,dKs_activation_score,primary,Current-weighted recruitment is more mechanistic than raw mean gate value.
+effective gap mapping,P_gap_eff = d * pk,primary,Raw d and pk remain structurally confounded; the product is the reviewer-facing coordinate.
+available surface,alpha2 = gamma_s_eff,primary,Interpreted as available spatial transfer surface-to-volume capacity in the reduced model.
+recruited surface,alpha2 * dKs_activation_score,primary,Combines available capacity with dynamic recruitment; not an anatomical cell-count estimate.
+isopotentiality proxy,1 / (1 + r_model),secondary,Reduced-model analogue because the ODE has no explicit neighboring-cell voltage state.
+pump proxy,K_o recovery and undershoot summaries,secondary,"Observable recovery descriptors, not literal Na/K ATPase flux."
+deprecated,raw d as anatomical syncytium size,deprecated,"Superseded by P_gap_eff, available surface, and recruited-surface proxies."

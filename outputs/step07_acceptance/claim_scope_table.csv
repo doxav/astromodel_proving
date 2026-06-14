@@ -1,4 +1,4 @@
 assumption_axis,status,final_degeneracy_claim_allowed_after_step07
-gating_form,model_dependent_or_insufficient_evidence,False
+gating_form,robust,False
 intracellular_K_as_ECS_proxy,explicit_ecs_variant_or_extra_data_needed,False
 local_syncytial_compartment_split,split_robust,False

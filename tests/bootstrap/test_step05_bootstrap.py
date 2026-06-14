@@ -9,6 +9,7 @@ from src.step05_mechanistic_decomposition import (
     reconstruct_flat_params,
     run_step05_mechanistic_decomposition,
 )
+from src.phenotype_classifier import measure_registry_table
 from src.astro_model import CURRENT_DICT_K_BATH_VALUES, build_paramdict
 
 
@@ -118,3 +119,28 @@ def test_step05_flux_rows_record_current_specific_protocol_and_stimulus_window(
             row.get("k_bath_gain", 1.0)
         )
         assert np.isclose(float(row["K_bath_middle_used"]), expected)
+
+
+def test_step05_measure_registry_contains_reused_characterization_measures() -> None:
+    registry = measure_registry_table()
+    assert {"measure_family", "measure", "status", "rationale"}.issubset(registry.columns)
+    assert registry["measure"].astype(str).str.contains("dKs_activation_score").any()
+    assert registry["measure"].astype(str).str.contains("P_gap_eff").any()
+
+
+def test_step05_windowed_phenotype_outputs_are_generated(project_root):
+    result = run_step05_mechanistic_decomposition(
+        project_root,
+        Step05Config(
+            max_candidates=1,
+            time_points=60,
+            bootstrap_iterations=0,
+            write_outputs=False,
+        ),
+    )
+    windowed = result["accepted_fit_mechanisms_windowed"]
+    tags = result["buffering_phenotype_tags"]
+    assert not windowed.empty
+    assert {"M0", "M_rise", "M_decay", "M_tot"}.issubset(set(windowed["window"]))
+    assert windowed["dKs_activation_score"].between(0.0, 1.0).all()
+    assert "buffering_phenotype" in tags.columns

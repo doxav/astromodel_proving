@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from src.step08_parameter_plausibility import EFFECTIVE_PARAMETERS, Step08Config, run_step08_parameter_plausibility
+from src.step08_parameter_plausibility import (
+    EFFECTIVE_PARAMETERS,
+    Step08Config,
+    load_or_create_parameter_ranges,
+    run_step08_parameter_plausibility,
+)
 
 
 def test_step08_writes_required_outputs(project_root):
@@ -19,6 +24,7 @@ def test_step08_writes_required_outputs(project_root):
     ]:
         assert (out_dir / filename).exists()
     assert result["analysis_summary"]["n_parameter_rows"] == len(result["parameter_range_audit"])
+    assert "parameter_ranges_status" in result["analysis_summary"]
 
 
 def test_step08_effective_output_contains_only_effective_coordinates(project_root):
@@ -41,3 +47,36 @@ def test_step08_final_degeneracy_claims_remain_disabled(project_root):
     assert "final_degeneracy_claim_allowed_after_step08" in status.columns
     assert not status["final_degeneracy_claim_allowed_after_step08"].astype(bool).any()
     assert result["analysis_summary"]["final_degeneracy_claim_allowed_after_step08"] is False
+
+
+def test_step08_range_audit_exposes_lower_and_upper_bound_flags(project_root):
+    result = run_step08_parameter_plausibility(
+        project_root,
+        Step08Config(max_candidates=1, write_outputs=False),
+    )
+    audit = result["parameter_range_audit"]
+    assert {
+        "below_lower_bound",
+        "above_upper_bound",
+        "within_lower_bound",
+        "within_upper_bound",
+        "bound_violation",
+    }.issubset(audit.columns)
+    assert audit["bound_violation"].isin(
+        {"none", "below_lower_bound", "above_upper_bound"}
+    ).all()
+
+
+def test_step08_reuses_editable_parameter_range_csv(project_root, tmp_path):
+    editable = tmp_path / "parameter_ranges.csv"
+    ranges, _, _ = load_or_create_parameter_ranges(project_root)
+    ranges.to_csv(editable, index=False)
+    result = run_step08_parameter_plausibility(
+        project_root,
+        Step08Config(
+            max_candidates=1,
+            parameter_ranges_path=str(editable),
+            write_outputs=False,
+        ),
+    )
+    assert result["analysis_summary"]["parameter_ranges_status"] == "reused_existing_editable_csv"

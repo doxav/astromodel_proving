@@ -27,6 +27,12 @@ from .astro_model import (
 )
 from .contracts import protocol_condition
 from .mechanisms import compute_flux_summary, compute_proxy_validity
+from .phenotype_classifier import (
+    build_mode_vectors,
+    compute_windowed_buffering_scores,
+    measure_registry_table,
+    summarize_phenotypes,
+)
 from .protocols import stim_window_seconds
 
 OUTPUT_SUBDIR = "mechanisms"
@@ -257,13 +263,14 @@ def _time_grid(config: Step05Config) -> np.ndarray:
     )
 
 
-def simulate_candidate_sweeps(
+def _simulate_candidate_outputs(
     candidate: Mapping[str, Any], config: Step05Config
-) -> pd.DataFrame:
-    """Simulate all six sweeps for one accepted candidate and return flux rows."""
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Simulate all six sweeps for one accepted candidate and return Step 05 rows."""
 
     time_ms = _time_grid(config)
-    rows: list[dict[str, Any]] = []
+    flux_rows: list[dict[str, Any]] = []
+    windowed_rows: list[pd.DataFrame] = []
     condition = str(candidate["condition"])
     window_s = stim_window_seconds(condition)
     protocol_key = protocol_condition(condition)
@@ -303,6 +310,13 @@ def simulate_candidate_sweeps(
                 "simulation_status": "ok",
                 "failure_reason": "",
             }
+            windowed_rows.append(
+                compute_windowed_buffering_scores(
+                    sim,
+                    stim_window_s=window_s,
+                    metadata=base,
+                )
+            )
         except Exception as exc:  # noqa: BLE001 - failures must be explicit rows
             row = {
                 **base,
@@ -310,8 +324,22 @@ def simulate_candidate_sweeps(
                 "failure_reason": f"{type(exc).__name__}: {exc}",
                 "proxy_validity_class": "failed",
             }
-        rows.append(row)
-    return pd.DataFrame(rows)
+        flux_rows.append(row)
+    windowed = (
+        pd.concat(windowed_rows, ignore_index=True)
+        if windowed_rows
+        else pd.DataFrame()
+    )
+    return pd.DataFrame(flux_rows), windowed
+
+
+def simulate_candidate_sweeps(
+    candidate: Mapping[str, Any], config: Step05Config
+) -> pd.DataFrame:
+    """Simulate all six sweeps for one accepted candidate and return flux rows."""
+
+    flux_rows, _ = _simulate_candidate_outputs(candidate, config)
+    return flux_rows
 
 
 def build_candidate_mechanism_table(fit_mechanisms: pd.DataFrame) -> pd.DataFrame:
@@ -785,12 +813,28 @@ def run_step05_mechanistic_decomposition(
     ensemble, source_path = load_step04_accepted_ensemble(
         root, max_candidates=config.max_candidates
     )
-    sweep_tables = [
-        simulate_candidate_sweeps(row.to_dict(), config)
-        for _, row in ensemble.iterrows()
-    ]
+    sweep_tables: list[pd.DataFrame] = []
+    windowed_tables: list[pd.DataFrame] = []
+    for _, row in ensemble.iterrows():
+        flux_rows, windowed_rows = _simulate_candidate_outputs(row.to_dict(), config)
+        sweep_tables.append(flux_rows)
+        if not windowed_rows.empty:
+            windowed_tables.append(windowed_rows)
     fit_mechanisms = pd.concat(sweep_tables, ignore_index=True)
+    windowed_mechanisms = (
+        pd.concat(windowed_tables, ignore_index=True)
+        if windowed_tables
+        else pd.DataFrame()
+    )
+    phenotype_tags = summarize_phenotypes(windowed_mechanisms)
     candidate_table = build_candidate_mechanism_table(fit_mechanisms)
+    if not phenotype_tags.empty:
+        candidate_table = candidate_table.merge(
+            phenotype_tags,
+            on=IDENTITY_COLUMNS,
+            how="left",
+            validate="one_to_one",
+        )
     candidate_table["proxy_validity_status"] = np.where(
         candidate_table["proxy_validity_failed_fraction"].astype(float)
         >= float(config.proxy_failure_downgrade_fraction),
@@ -823,6 +867,32 @@ def run_step05_mechanistic_decomposition(
     enrichment = summarize_region_enrichment(clustered, config.small_stratum_min_cells)
     geometry = classify_geometry(clustered, config)
     claim_scope = build_claim_scope_table(clustered, geometry)
+    mode_vectors = build_mode_vectors(windowed_mechanisms)
+    measure_registry = measure_registry_table()
+    phenotype_counts = (
+        windowed_mechanisms.groupby(
+            ["region", "condition", "window", "buffering_phenotype"],
+            as_index=False,
+            dropna=False,
+        )
+        .agg(
+            n_candidate_sweeps=("candidate_id", "size"),
+            n_candidates=("candidate_id", "nunique"),
+            n_cells=("file_id", "nunique"),
+        )
+        if not windowed_mechanisms.empty
+        else pd.DataFrame(
+            columns=[
+                "region",
+                "condition",
+                "window",
+                "buffering_phenotype",
+                "n_candidate_sweeps",
+                "n_candidates",
+                "n_cells",
+            ]
+        )
+    )
     perf = (
         compare_simulation_grid_performance(root, max_candidates=min(1, len(ensemble)))
         if config.write_outputs
@@ -839,6 +909,8 @@ def run_step05_mechanistic_decomposition(
         "config": asdict(config),
         "n_input_candidates": int(len(ensemble)),
         "n_candidate_sweep_rows": int(len(fit_mechanisms)),
+        "n_windowed_mechanism_rows": int(len(windowed_mechanisms)),
+        "n_phenotype_tag_rows": int(len(phenotype_tags)),
         "n_successful_sweep_simulations": int(
             (fit_mechanisms["simulation_status"] == "ok").sum()
         ),
@@ -862,6 +934,16 @@ def run_step05_mechanistic_decomposition(
 
     if config.write_outputs:
         fit_mechanisms.to_csv(out_dir / "accepted_fit_mechanisms.csv", index=False)
+        windowed_mechanisms.to_csv(
+            out_dir / "accepted_fit_mechanisms_windowed.csv", index=False
+        )
+        phenotype_tags.to_csv(out_dir / "buffering_phenotype_tags.csv", index=False)
+        phenotype_counts.to_csv(
+            out_dir / "phenotype_counts_by_region_condition_window.csv",
+            index=False,
+        )
+        mode_vectors.to_csv(out_dir / "M_mode_vector_by_configuration.csv", index=False)
+        measure_registry.to_csv(out_dir / "measure_registry_status.csv", index=False)
         clustered.to_csv(out_dir / "mechanism_clusters.csv", index=False)
         representatives.to_csv(out_dir / "representatives.csv", index=False)
         enrichment.to_csv(out_dir / "region_mechanism_enrichment.csv", index=False)
@@ -876,6 +958,11 @@ def run_step05_mechanistic_decomposition(
 
     return {
         "accepted_fit_mechanisms": fit_mechanisms,
+        "accepted_fit_mechanisms_windowed": windowed_mechanisms,
+        "buffering_phenotype_tags": phenotype_tags,
+        "phenotype_counts_by_region_condition_window": phenotype_counts,
+        "M_mode_vector_by_configuration": mode_vectors,
+        "measure_registry_status": measure_registry,
         "mechanism_clusters": clustered,
         "representatives": representatives,
         "region_mechanism_enrichment": enrichment,

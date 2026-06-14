@@ -35,7 +35,8 @@ IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
 
 @dataclass(slots=True)
 class Step06Config:
-    max_candidates: int | None = 3
+    max_candidates: int | None = None
+    candidate_policy: str = "best_per_cell"
     time_points: int = 80
     t_final_ms: float = 50_000.0
     prediction_interval_quantiles: tuple[float, float, float] = (0.05, 0.5, 0.95)
@@ -46,17 +47,20 @@ class Step06Config:
         default_factory=lambda: {
             "nominal": 1.0,
             "eps_scale_low": 0.5,
-            "eps_scale_high": 1.5,
+            "eps_scale_high": 2.0,
             "stimulus_duration_short": 0.75,
             "stimulus_duration_long": 1.25,
-            "baseline_K_o_low": 0.95,
-            "baseline_K_o_high": 1.05,
-            "current_scale_low": 0.9,
-            "current_scale_high": 1.1,
+            "baseline_K_o_low": 0.90,
+            "baseline_K_o_high": 1.10,
+            "current_scale_low": 0.75,
+            "current_scale_high": 1.25,
         }
     )
     robustness_recovery_error_max: float = 1.5
     robustness_peak_ratio_max: float = 1.75
+    robustness_K_o_peak_max_mM: float = 15.0
+    robustness_K_o_final_max_mM: float = 7.0
+    min_perturbation_feature_pass_fraction: float = 0.25
     min_robust_fraction: float = 0.50
     write_outputs: bool = True
     require_candidate_level_heldout: bool = True
@@ -99,9 +103,57 @@ def load_mechanism_labels(project_root: Path | str, max_candidates: int | None =
 
 
 def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[pd.DataFrame, pd.DataFrame]:
-    ensemble, _ = load_step04_accepted_ensemble(project_root, max_candidates=config.max_candidates)
+    ensemble, _ = load_step04_accepted_ensemble(project_root, max_candidates=None)
+    if config.candidate_policy not in {"all", "best_per_cell"}:
+        raise ValueError("candidate_policy must be 'all' or 'best_per_cell'")
+    if config.candidate_policy == "best_per_cell" and not ensemble.empty:
+        sort_cols = [
+            c
+            for c in [
+                "file_id",
+                "cell_reviewer_facing",
+                "holdout_mean_pass_fraction",
+                "mean_weighted_pass_fraction",
+                "holdout_mean_rmse_mV",
+                "mean_trace_rmse_mV",
+                "ensemble_rank",
+            ]
+            if c in ensemble.columns
+        ]
+        ascending = [
+            True,
+            False,
+            False,
+            False,
+            True,
+            True,
+            True,
+        ][: len(sort_cols)]
+        ensemble = (
+            ensemble.sort_values(sort_cols, ascending=ascending)
+            .groupby("file_id", as_index=False, dropna=False)
+            .head(1)
+            .reset_index(drop=True)
+        )
+    if config.max_candidates is not None:
+        ensemble = ensemble.sort_values(IDENTITY_COLUMNS).head(int(config.max_candidates)).copy()
     mechanisms = load_mechanism_labels(project_root, max_candidates=None)
-    keep_cols = [c for c in mechanisms.columns if c in set(IDENTITY_COLUMNS + ["mechanism_cluster", "dominant_mechanism", "cluster_evidence_status", "cluster_claim_scope"])]
+    keep_cols = [
+        c
+        for c in mechanisms.columns
+        if c
+        in set(
+            IDENTITY_COLUMNS
+            + [
+                "mechanism_cluster",
+                "dominant_mechanism",
+                "cluster_evidence_status",
+                "cluster_claim_scope",
+                "buffering_phenotype",
+                "phenotype_claim_scope",
+            ]
+        )
+    ]
     merged = ensemble.merge(
         mechanisms[keep_cols].drop_duplicates(IDENTITY_COLUMNS),
         on=IDENTITY_COLUMNS,
@@ -112,6 +164,8 @@ def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[
     merged["dominant_mechanism"] = merged.get("dominant_mechanism", pd.Series(index=merged.index, dtype=object)).fillna("unknown")
     merged["cluster_evidence_status"] = merged.get("cluster_evidence_status", pd.Series(index=merged.index, dtype=object)).fillna("insufficient_evidence")
     merged["cluster_claim_scope"] = merged.get("cluster_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_label")
+    merged["buffering_phenotype"] = merged.get("buffering_phenotype", pd.Series(index=merged.index, dtype=object)).fillna("unlabeled")
+    merged["phenotype_claim_scope"] = merged.get("phenotype_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_phenotype")
     return merged, mechanisms
 
 
@@ -297,42 +351,121 @@ def compute_feature_distribution_ppc(project_root: Path | str, feature_predictio
     return pd.DataFrame(rows)
 
 
-def run_perturbation_sweeps(candidates: pd.DataFrame, config: Step06Config) -> pd.DataFrame:
+def _feature_pass_fraction_for_sim(
+    thresholds: pd.DataFrame,
+    sim: Mapping[str, Any],
+    *,
+    region: str,
+    condition: str,
+    sweep: int,
+    onset_s: float,
+    offset_s: float,
+) -> tuple[float, int, str]:
+    """Score one perturbed Vm trace against Step 02 feature bands."""
+
+    time_s = np.asarray(sim["t_ms"], dtype=float) / 1000.0
+    features = extract_features_from_trace(
+        time_s,
+        np.asarray(sim["Vm"], dtype=float),
+        onset_s=float(onset_s),
+        offset_s=float(offset_s),
+    )
+    evaluated = 0
+    passed = 0
+    fallbacks: list[str] = []
+    for feature, value in features.items():
+        if feature not in FEATURE_COLUMNS or not np.isfinite(float(value)):
+            continue
+        threshold, fallback = _find_threshold(
+            thresholds, condition=str(condition), region=str(region), sweep=int(sweep), feature=str(feature)
+        )
+        fallbacks.append(fallback)
+        if threshold is None:
+            continue
+        evaluated += 1
+        lower = float(threshold["acceptable_lower"])
+        upper = float(threshold["acceptable_upper"])
+        passed += int(lower <= float(value) <= upper)
+    if evaluated == 0:
+        return float("nan"), 0, "missing"
+    fallback_status = (
+        "region_specific"
+        if "region_specific" in fallbacks
+        else ("region_pooled" if "region_pooled" in fallbacks else "global_fallback")
+    )
+    return float(passed / evaluated), int(evaluated), fallback_status
+
+
+def _duration_adjusted_paramdict(
+    condition: str,
+    current_na: int,
+    params: Mapping[str, Any],
+    factor: float,
+) -> tuple[dict[str, Any], tuple[float, float]]:
+    """Return a paramdict with the middle K bath interval duration scaled."""
+
+    paramdict = build_paramdict(protocol_condition(condition), int(current_na), params)
+    times = np.asarray(paramdict["external"]["K_bath"]["time"], dtype=float).copy()
+    if len(times) < 3:
+        raise ValueError("K bath protocol must contain baseline, stimulus, and recovery times")
+    onset_ms = float(times[1])
+    original_offset_ms = float(times[2])
+    new_offset_ms = onset_ms + max(1.0, (original_offset_ms - onset_ms) * float(factor))
+    times[2] = new_offset_ms
+    paramdict["external"]["K_bath"]["time"] = times
+    return paramdict, (onset_ms / 1000.0, new_offset_ms / 1000.0)
+
+
+def _hidden_flux_plausible(flux: Mapping[str, Any]) -> bool:
+    """Check that hidden-current fractions are finite and bounded."""
+
+    fractions = [
+        float(flux.get("gap_fraction", np.nan)),
+        float(flux.get("kir_fraction", np.nan)),
+        float(flux.get("leak_fraction", np.nan)),
+    ]
+    if not all(np.isfinite(f) for f in fractions):
+        return False
+    return all(-1e-9 <= f <= 1.0 + 1e-9 for f in fractions)
+
+
+def run_perturbation_sweeps(
+    candidates: pd.DataFrame, config: Step06Config, project_root: Path | str
+) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
-    current_list = [int(config.perturbation_current_na)] if config.perturbation_current_na else [100]
+    root = Path(project_root).resolve()
+    thresholds = _load_thresholds(root)
+    current_list = (
+        [int(config.perturbation_current_na)]
+        if config.perturbation_current_na
+        else [int(c) for c in VALID_CURRENTS]
+    )
     for _, cand in candidates.iterrows():
         condition = str(cand["condition"])
         window_s = stim_window_seconds(condition)
         for current_na in current_list:
+            sweep = (
+                list(VALID_CURRENTS).index(current_na) + 1
+                if current_na in VALID_CURRENTS
+                else 1
+            )
             nominal_peak = np.nan
             for name, factor in config.perturbation_factors.items():
                 row_base = {
                     **{c: cand.get(c) for c in IDENTITY_COLUMNS},
                     "mechanism_cluster": cand.get("mechanism_cluster", "unlabeled"),
                     "dominant_mechanism": cand.get("dominant_mechanism", "unknown"),
+                    "buffering_phenotype": cand.get("buffering_phenotype", "unlabeled"),
                     "current_na": int(current_na),
+                    "sweep": int(sweep),
                     "perturbation": name,
                     "perturbation_factor": float(factor),
                 }
-                if name.startswith("stimulus_duration"):
-                    rows.append(
-                        {
-                            **row_base,
-                            "robust_under_perturbation": False,
-                            "functional_buffering_pass": False,
-                            "perturbation_status": "not_run_protocol_timing_pending_model_api",
-                            "simulation_status": "unsupported",
-                            "failure_reason": "stimulus-duration perturbation requires protocol timing support in simulator API",
-                        }
-                    )
-                    continue
                 try:
                     params = reconstruct_flat_params(
                         cand.to_dict(),
                         current_na=current_na,
-                        sweep=list(VALID_CURRENTS).index(current_na) + 1
-                        if current_na in VALID_CURRENTS
-                        else None,
+                        sweep=sweep,
                     )
                     if name.startswith("eps_scale"):
                         params["eps"] = float(params["eps"]) * float(factor)
@@ -340,9 +473,17 @@ def run_perturbation_sweeps(candidates: pd.DataFrame, config: Step06Config) -> p
                         params["K_bath_value_middle"] = (
                             float(params["K_bath_value_middle"]) * float(factor)
                         )
-                    paramdict = build_paramdict(
-                        protocol_condition(condition), int(current_na), params
-                    )
+                    if name.startswith("stimulus_duration"):
+                        paramdict, active_window_s = _duration_adjusted_paramdict(
+                            condition, int(current_na), params, float(factor)
+                        )
+                        t_grid = _time_grid(config)
+                    else:
+                        paramdict = build_paramdict(
+                            protocol_condition(condition), int(current_na), params
+                        )
+                        active_window_s = window_s
+                        t_grid = _time_grid(config)
                     if name.startswith("baseline_K_o"):
                         paramdict["external"]["K_o0"] = (
                             float(paramdict["external"]["K_o0"]) * float(factor)
@@ -352,11 +493,11 @@ def run_perturbation_sweeps(candidates: pd.DataFrame, config: Step06Config) -> p
                         {
                             "experiment_type": protocol_condition(condition),
                             "current_na": int(current_na),
-                            "t_eval_ms": _time_grid(config),
+                            "t_eval_ms": t_grid,
                         },
                         return_hidden=True,
                     )
-                    flux = compute_flux_summary(sim, stim_window_s=window_s)
+                    flux = compute_flux_summary(sim, stim_window_s=active_window_s)
                     if name == "nominal":
                         nominal_peak = float(flux.get("K_o_peak", np.nan))
                     peak_ratio = (
@@ -364,20 +505,48 @@ def run_perturbation_sweeps(candidates: pd.DataFrame, config: Step06Config) -> p
                         if np.isfinite(nominal_peak) and abs(nominal_peak) > 1e-12
                         else np.nan
                     )
+                    vm_feature_pass, n_vm_features, feature_fallback = _feature_pass_fraction_for_sim(
+                        thresholds,
+                        sim,
+                        region=str(cand.get("region")),
+                        condition=condition,
+                        sweep=sweep,
+                        onset_s=active_window_s[0],
+                        offset_s=active_window_s[1],
+                    )
+                    hidden_flux_plausible = _hidden_flux_plausible(flux)
                     functional_buffering_pass = bool(
                         np.isfinite(float(flux.get("K_o_recovery_error", np.nan)))
                         and abs(float(flux.get("K_o_recovery_error", np.nan)))
                         <= config.robustness_recovery_error_max
+                        and np.isfinite(float(flux.get("K_o_peak", np.nan)))
+                        and float(flux.get("K_o_peak", np.nan))
+                        <= config.robustness_K_o_peak_max_mM
+                        and np.isfinite(float(flux.get("K_o_final", np.nan)))
+                        and abs(float(flux.get("K_o_final", np.nan)))
+                        <= config.robustness_K_o_final_max_mM
                         and (
                             not np.isfinite(peak_ratio)
                             or abs(peak_ratio) <= config.robustness_peak_ratio_max
                         )
+                        and (
+                            not np.isfinite(vm_feature_pass)
+                            or vm_feature_pass
+                            >= config.min_perturbation_feature_pass_fraction
+                        )
+                        and hidden_flux_plausible
                     )
                     rows.append(
                         {
                             **row_base,
                             **flux,
                             "K_o_peak_ratio_to_nominal": peak_ratio,
+                            "Vm_feature_pass_fraction": vm_feature_pass,
+                            "n_Vm_features_scored": n_vm_features,
+                            "Vm_feature_threshold_fallback": feature_fallback,
+                            "hidden_flux_plausible": hidden_flux_plausible,
+                            "active_stim_window_start_s": float(active_window_s[0]),
+                            "active_stim_window_end_s": float(active_window_s[1]),
                             "robust_under_perturbation": functional_buffering_pass,
                             "functional_buffering_pass": functional_buffering_pass,
                             "perturbation_status": "evaluated",
@@ -391,6 +560,12 @@ def run_perturbation_sweeps(candidates: pd.DataFrame, config: Step06Config) -> p
                             **row_base,
                             "robust_under_perturbation": False,
                             "functional_buffering_pass": False,
+                            "Vm_feature_pass_fraction": np.nan,
+                            "n_Vm_features_scored": 0,
+                            "Vm_feature_threshold_fallback": "missing",
+                            "hidden_flux_plausible": False,
+                            "active_stim_window_start_s": float(window_s[0]),
+                            "active_stim_window_end_s": float(window_s[1]),
                             "perturbation_status": "failed",
                             "simulation_status": "failed",
                             "failure_reason": f"{type(exc).__name__}: {exc}",
@@ -431,6 +606,16 @@ def build_robustness_summary(
         robust_frac = (
             float(_as_bool(q["functional_buffering_pass"]).mean()) if not q.empty else np.nan
         )
+        perturb_feature_pass = (
+            float(pd.to_numeric(q["Vm_feature_pass_fraction"], errors="coerce").mean(skipna=True))
+            if "Vm_feature_pass_fraction" in q and not q.empty
+            else np.nan
+        )
+        hidden_flux_plausible_fraction = (
+            float(_as_bool(q["hidden_flux_plausible"]).mean())
+            if "hidden_flux_plausible" in q and not q.empty
+            else np.nan
+        )
         evidence = (
             str(group["cluster_evidence_status"].iloc[0])
             if "cluster_evidence_status" in group
@@ -459,6 +644,26 @@ def build_robustness_summary(
             config.final_degeneracy_claim_allowed
             and validation_label == "predictive_supported"
         )
+        score_parts = [
+            holdout_pass if np.isfinite(holdout_pass) else np.nan,
+            ppc_cov if np.isfinite(ppc_cov) else np.nan,
+            robust_frac if np.isfinite(robust_frac) else np.nan,
+            perturb_feature_pass if np.isfinite(perturb_feature_pass) else np.nan,
+            hidden_flux_plausible_fraction
+            if np.isfinite(hidden_flux_plausible_fraction)
+            else np.nan,
+        ]
+        finite_parts = [float(x) for x in score_parts if np.isfinite(x)]
+        biological_description_score = (
+            float(np.clip(np.mean(finite_parts), 0.0, 1.0))
+            if finite_parts
+            else np.nan
+        )
+        phenotype_labels = (
+            ";".join(sorted(group["buffering_phenotype"].astype(str).dropna().unique()))
+            if "buffering_phenotype" in group
+            else "unlabeled"
+        )
         claim_scope_after_step06 = (
             f"{step06_screen_claim}; final degeneracy wording remains prohibited "
             "until assumption-sensitivity and parameter-plausibility checks pass"
@@ -473,6 +678,10 @@ def build_robustness_summary(
                 "holdout_pass_fraction": holdout_pass,
                 "mean_weighted_ppc_coverage": ppc_cov,
                 "perturbation_robust_fraction": robust_frac,
+                "perturbation_vm_feature_pass_fraction": perturb_feature_pass,
+                "hidden_flux_plausible_fraction": hidden_flux_plausible_fraction,
+                "biological_description_score": biological_description_score,
+                "buffering_phenotype_labels": phenotype_labels,
                 "step05_evidence_status": evidence,
                 "validation_label": validation_label,
                 "step06_screen_claim": step06_screen_claim,
@@ -538,7 +747,7 @@ def run_step06_predictive_validation(project_root: Path | str, config: Step06Con
     feature_predictions, nominal_flux = simulate_candidate_feature_rows(candidates, config)
     intervals = build_prediction_intervals(feature_predictions, config)
     ppc = compute_feature_distribution_ppc(root, feature_predictions)
-    perturb = run_perturbation_sweeps(candidates, config)
+    perturb = run_perturbation_sweeps(candidates, config, root)
     robustness = build_robustness_summary(heldout, ppc, perturb, candidates, config)
     perf = compare_step06_runtime_presets(root) if config.write_outputs else pd.DataFrame()
     summary = {

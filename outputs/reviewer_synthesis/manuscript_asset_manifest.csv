@@ -1,0 +1,13 @@
+step,artifact,purpose,exists,claim_scope
+Step 00,outputs/provenance/atf_region_condition_inventory.csv,ATF data provenance and region/condition audit,True,reviewer_facing_source_table
+Step 02,outputs/features/condition_region_sweep_thresholds.csv,Region-aware feature thresholds,True,reviewer_facing_source_table
+Step 03,outputs/identifiability/effective_parameter_map.csv,Effective-parameter and identifiability guardrails,True,reviewer_facing_source_table
+Step 04,outputs/cell_fits/accepted_cell_ensembles.csv,Accepted six-sweep cell ensembles,True,reviewer_facing_source_table
+Step 04,outputs/cell_fits/cell_fit_candidates.csv,Full candidate history for audit,True,reviewer_facing_source_table
+Step 05,outputs/mechanisms/accepted_fit_mechanisms.csv,Hidden-current flux decomposition,True,reviewer_facing_source_table
+Step 05,outputs/mechanisms/accepted_fit_mechanisms_windowed.csv,Windowed local/spatial mechanism characterization,True,reviewer_facing_source_table
+Step 05,outputs/mechanisms/buffering_phenotype_tags.csv,Provisional phenotype tags,True,reviewer_facing_source_table
+Step 06,outputs/predictive_validation/robustness_summary.csv,Prediction and perturbation robustness,True,reviewer_facing_source_table
+Step 07,outputs/assumption_sensitivity/claim_scope_table.csv,Assumption-sensitivity claim scope,True,reviewer_facing_source_table
+Step 08,outputs/parameter_plausibility/interpretability_status.csv,Parameter interpretability guardrails,True,reviewer_facing_source_table
+Step 09,outputs/reviewer_synthesis/reviewer_traceability_table.csv,R1-R7 response map,True,reviewer_facing_source_table

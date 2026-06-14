@@ -1,7 +1,7 @@
 db_name,condition,current_na,parameter_space,fim_is_symmetric,smallest_eigenvalue,largest_eigenvalue,near_zero_mode_count,log10_eigenvalue_span,n_parameters,claim_guardrail
-CONTROL_75nA.db,CONTROL,75,effective,True,1.0053894457899991e-09,8945.382892803655,2,12.949264612730094,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
-CONTROL_75nA.db,CONTROL,75,raw,True,9.093672108420222e-10,8967.926038744552,3,12.9939527270956,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
-MFA_100nA.db,MFA,100,effective,True,1.063936265637971e-08,10273.544398878292,1,11.984804689518128,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
-MFA_100nA.db,MFA,100,raw,True,3.962642126207044e-09,10342.615300229138,2,12.41664551900157,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
-BARIUM_100nA.db,BARIUM,100,effective,True,2.886527869674845e-10,2367.288020284144,3,12.913875345344564,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
-BARIUM_100nA.db,BARIUM,100,raw,True,2.635980943180645e-10,2372.74585586435,4,12.954308957347433,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+CONTROL_75nA.db,CONTROL,75,effective,True,1.0053841544010605e-09,8945.381232006404,2,12.94926681780746,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+CONTROL_75nA.db,CONTROL,75,raw,True,9.093703110977565e-10,8967.924396947197,3,12.993951166973583,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+MFA_100nA.db,MFA,100,effective,True,6.948976598244399e-09,10273.53470731269,1,12.169799043326904,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+MFA_100nA.db,MFA,100,raw,True,2.429352747792481e-09,10342.605607227271,2,12.629139384149429,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+BARIUM_100nA.db,BARIUM,100,effective,True,3.1515185190303934e-10,2367.2887596926034,3,12.875731372518318,9,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy
+BARIUM_100nA.db,BARIUM,100,raw,True,4.6250397703580986e-10,2372.746854186728,4,12.710135934721396,10,limited identifiability/sloppiness under Vm-only observation; not biological degeneracy

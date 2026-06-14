@@ -2,6 +2,7 @@
   "step_name": "Step 06 \u2014 Predictive validation and perturbation robustness",
   "config": {
     "max_candidates": 1,
+    "candidate_policy": "best_per_cell",
     "time_points": 40,
     "t_final_ms": 50000.0,
     "prediction_interval_quantiles": [
@@ -15,16 +16,19 @@
     "perturbation_factors": {
       "nominal": 1.0,
       "eps_scale_low": 0.5,
-      "eps_scale_high": 1.5,
+      "eps_scale_high": 2.0,
       "stimulus_duration_short": 0.75,
       "stimulus_duration_long": 1.25,
-      "baseline_K_o_low": 0.95,
-      "baseline_K_o_high": 1.05,
-      "current_scale_low": 0.9,
-      "current_scale_high": 1.1
+      "baseline_K_o_low": 0.9,
+      "baseline_K_o_high": 1.1,
+      "current_scale_low": 0.75,
+      "current_scale_high": 1.25
     },
     "robustness_recovery_error_max": 1.5,
     "robustness_peak_ratio_max": 1.75,
+    "robustness_K_o_peak_max_mM": 15.0,
+    "robustness_K_o_final_max_mM": 7.0,
+    "min_perturbation_feature_pass_fraction": 0.25,
     "min_robust_fraction": 0.5,
     "write_outputs": true,
     "require_candidate_level_heldout": true,
@@ -34,10 +38,10 @@
   "n_heldout_rows": 8,
   "n_prediction_interval_rows": 54,
   "n_ppc_rows": 54,
-  "n_perturbation_rows": 9,
+  "n_perturbation_rows": 54,
   "validation_labels": [
     "insufficient_evidence"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 3.531532459999653
+  "elapsed_seconds": 5.760123271000339
 }

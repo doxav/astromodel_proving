@@ -42,12 +42,13 @@ STEP08_CONTRACT_ID = "step08_all_valid_currents_plausibility_flux_rescore_v1"
 class Step08Config:
     """Configuration for Step 08.
 
-    ``max_candidates`` keeps tests/notebooks fast while preserving the same
-    identity, region, condition, mechanism, and held-out contracts as Steps 04-07.
+    ``max_candidates`` is an optional development/test cap.  The default
+    reviewer-facing execution keeps all selected cell-level candidates.
     """
 
-    max_candidates: int | None = 3
-    constrained_max_candidates: int = 3
+    max_candidates: int | None = None
+    candidate_policy: str = "best_per_cell"
+    constrained_max_candidates: int | None = None
     time_points: int = 40
     t_final_ms: float = 50_000.0
     currents_na: tuple[int, ...] = tuple(int(c) for c in VALID_CURRENTS)
@@ -57,6 +58,7 @@ class Step08Config:
     acceptable_fit_degradation_fraction: float = 0.15
     mechanism_flux_fraction_delta_max: float = 0.20
     changed_fit_degradation_warn_mV: float = 5.0
+    parameter_ranges_path: str | None = None
     write_outputs: bool = True
 
 
@@ -95,6 +97,54 @@ def default_parameter_ranges() -> pd.DataFrame:
         rows,
         columns=["parameter", "coordinate_type", "lower_bound", "upper_bound", "range_source", "range_basis"],
     )
+
+
+def validate_parameter_ranges(ranges: pd.DataFrame) -> pd.DataFrame:
+    """Validate and normalize a parameter-range table before audit use."""
+
+    required = {
+        "parameter",
+        "coordinate_type",
+        "lower_bound",
+        "upper_bound",
+        "range_source",
+        "range_basis",
+    }
+    missing = sorted(required - set(ranges.columns))
+    if missing:
+        raise ValueError(f"Parameter range table is missing required columns: {missing}")
+    out = ranges.copy()
+    out["lower_bound"] = pd.to_numeric(out["lower_bound"], errors="coerce")
+    out["upper_bound"] = pd.to_numeric(out["upper_bound"], errors="coerce")
+    invalid = out["lower_bound"].isna() | out["upper_bound"].isna() | (
+        out["lower_bound"] >= out["upper_bound"]
+    )
+    if bool(invalid.any()):
+        bad = out.loc[invalid, "parameter"].astype(str).tolist()
+        raise ValueError(f"Invalid lower/upper bounds for parameters: {bad}")
+    missing_params = sorted(set(AUDITED_PARAMETERS) - set(out["parameter"].astype(str)))
+    if missing_params:
+        raise ValueError(f"Parameter range table is missing audited parameters: {missing_params}")
+    return out.reset_index(drop=True)
+
+
+def load_or_create_parameter_ranges(
+    project_root: Path | str, configured_path: str | None = None
+) -> tuple[pd.DataFrame, Path, str]:
+    """Load an editable range table or create the default one if absent."""
+
+    root = Path(project_root).resolve()
+    path = (
+        Path(configured_path).expanduser().resolve()
+        if configured_path
+        else root / "outputs" / OUTPUT_SUBDIR / "parameter_ranges.csv"
+    )
+    if path.exists():
+        return validate_parameter_ranges(pd.read_csv(path)), path, "reused_existing_editable_csv"
+    ranges = default_parameter_ranges()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ranges.to_csv(path, index=False)
+    return validate_parameter_ranges(ranges), path, "created_default_editable_csv"
 
 
 def _profile_to_status(profile_class: str) -> str:
@@ -200,6 +250,7 @@ def load_step08_inputs(project_root: Path | str, config: Step08Config) -> pd.Dat
         project_root,
         Step06Config(
             max_candidates=config.max_candidates,
+            candidate_policy=config.candidate_policy,
             min_holdout_pass_fraction=config.min_holdout_pass_fraction,
             max_trace_rmse_mV=config.max_trace_rmse_mV,
             write_outputs=False,
@@ -314,6 +365,8 @@ def build_parameter_range_audit(
                 plausibility = "within_range"
             else:
                 plausibility = "out_of_range"
+            below_lower_bound = bool(np.isfinite(value) and value < float(r["lower_bound"]))
+            above_upper_bound = bool(np.isfinite(value) and value > float(r["upper_bound"]))
             ident_status = str(ident.get("identifiability_status", "not_profiled"))
             interpretable, guardrail = _interpretability_guardrail(plausibility, ident_status, str(r["coordinate_type"]))
             rows.append(
@@ -324,6 +377,15 @@ def build_parameter_range_audit(
                     "value": value,
                     "lower_bound": float(r["lower_bound"]),
                     "upper_bound": float(r["upper_bound"]),
+                    "below_lower_bound": below_lower_bound,
+                    "above_upper_bound": above_upper_bound,
+                    "within_lower_bound": bool(np.isfinite(value) and value >= float(r["lower_bound"])),
+                    "within_upper_bound": bool(np.isfinite(value) and value <= float(r["upper_bound"])),
+                    "bound_violation": (
+                        "below_lower_bound"
+                        if below_lower_bound
+                        else ("above_upper_bound" if above_upper_bound else "none")
+                    ),
                     "range_source": r["range_source"],
                     "range_basis": r["range_basis"],
                     "plausibility_status": plausibility,
@@ -447,7 +509,11 @@ def build_constrained_rerun_comparison(candidates: pd.DataFrame, parameter_audit
         parameter_audit = build_parameter_range_audit(candidates, parameter_audit, _default_identifiability_for_audit())
 
     rows: list[dict[str, Any]] = []
-    selected = candidates.head(int(config.constrained_max_candidates)).copy()
+    selected = (
+        candidates.copy()
+        if config.constrained_max_candidates is None
+        else candidates.head(int(config.constrained_max_candidates)).copy()
+    )
     for _, cand in selected.iterrows():
         constrained, adjusted_parameters = _constrained_candidate_from_audit(cand.to_dict(), parameter_audit)
         unconstrained_rmse = _as_float(cand.get("holdout_mean_rmse_mV", cand.get("mean_trace_rmse_mV")))
@@ -458,6 +524,8 @@ def build_constrained_rerun_comparison(candidates: pd.DataFrame, parameter_audit
             "dominant_mechanism": cand.get("dominant_mechanism", "unknown"),
             "mechanism_cluster_unconstrained": cand.get("mechanism_cluster", "unlabeled"),
             "constrained_screen_type": "broad_range_projection_not_full_optimizer",
+            "comparison_kind": "step04_unconstrained_candidate_vs_broad_range_projection",
+            "unconstrained_source": "step04_accepted_ensemble",
             "changed_by_constraints": bool(adjusted_parameters),
             "changed_parameters": ";".join(adjusted_parameters),
             "adjusted_parameters": ";".join(adjusted_parameters),
@@ -608,7 +676,9 @@ def run_step08_parameter_plausibility(
     out_dir = Path(output_dir).resolve() if output_dir is not None else root / "outputs" / OUTPUT_SUBDIR
 
     candidates = load_step08_inputs(root, config)
-    ranges = default_parameter_ranges()
+    ranges, ranges_path, ranges_status = load_or_create_parameter_ranges(
+        root, configured_path=config.parameter_ranges_path
+    )
     identifiability = load_identifiability_status(root)
     audit = build_parameter_range_audit(candidates, ranges, identifiability)
     effective = build_effective_parameter_plausibility(audit)
@@ -625,6 +695,8 @@ def run_step08_parameter_plausibility(
         "n_phys_interpretable_rows": int(audit["physiologically_interpretable"].astype(bool).sum()),
         "n_constrained_rerun_rows": int(constrained.shape[0]),
         "currents_na": [int(c) for c in config.currents_na],
+        "parameter_ranges_path": str(ranges_path),
+        "parameter_ranges_status": ranges_status,
         "final_degeneracy_claim_allowed_after_step08": False,
         "claim_scope": FINAL_CLAIM_TEXT,
     }

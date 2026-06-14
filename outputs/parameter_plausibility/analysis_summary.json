@@ -1,8 +1,9 @@
 {
   "step": "08_parameter_plausibility_and_constrained_reruns",
   "config": {
-    "max_candidates": 3,
-    "constrained_max_candidates": 3,
+    "max_candidates": null,
+    "candidate_policy": "best_per_cell",
+    "constrained_max_candidates": null,
     "time_points": 40,
     "t_final_ms": 50000.0,
     "currents_na": [
@@ -19,14 +20,15 @@
     "acceptable_fit_degradation_fraction": 0.15,
     "mechanism_flux_fraction_delta_max": 0.2,
     "changed_fit_degradation_warn_mV": 5.0,
+    "parameter_ranges_path": null,
     "write_outputs": true
   },
-  "n_candidates": 1,
-  "n_parameter_rows": 9,
-  "n_effective_rows": 4,
-  "n_out_of_range_rows": 0,
-  "n_phys_interpretable_rows": 3,
-  "n_constrained_rerun_rows": 6,
+  "n_candidates": 30,
+  "n_parameter_rows": 270,
+  "n_effective_rows": 120,
+  "n_out_of_range_rows": 50,
+  "n_phys_interpretable_rows": 79,
+  "n_constrained_rerun_rows": 180,
   "currents_na": [
     50,
     75,
@@ -35,6 +37,8 @@
     150,
     175
   ],
+  "parameter_ranges_path": "/home/xav/code/astromodel_proving/outputs/parameter_plausibility/parameter_ranges.csv",
+  "parameter_ranges_status": "reused_existing_editable_csv",
   "final_degeneracy_claim_allowed_after_step08": false,
   "claim_scope": "Step 08 supports parameter-interpretability guardrails, but final biological degeneracy claims remain disabled until Step 09 synthesis."
 }

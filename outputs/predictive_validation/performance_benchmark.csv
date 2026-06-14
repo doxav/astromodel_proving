@@ -1,3 +1,3 @@
 preset,time_points,elapsed_seconds,status,error,recommendation
-coarse,50,1.2670211370004836,ok,,default_or_coarse_available_for_manuscript_rerun
-default,80,1.25859827900058,ok,,default_recommended_for_tests
+coarse,50,2.624961126002745,ok,,default_or_coarse_available_for_manuscript_rerun
+default,80,2.472317240997654,ok,,default_recommended_for_tests

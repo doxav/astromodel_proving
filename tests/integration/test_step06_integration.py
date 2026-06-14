@@ -51,15 +51,18 @@ def test_step06_prediction_intervals_are_traceable_to_candidates(project_root):
     assert intervals["source_candidate_ids"].astype(str).str.len().gt(0).all()
 
 
-def test_step06_unsupported_perturbations_are_not_silently_dropped(project_root):
+def test_step06_duration_perturbations_are_evaluated_not_marked_unsupported(project_root):
     result = run_step06_predictive_validation(
         project_root, Step06Config(max_candidates=1, time_points=40, write_outputs=False)
     )
     perturb = result["perturbation_sweeps"]
     assert "perturbation_status" in perturb.columns
-    assert perturb["perturbation_status"].isin(
-        {"evaluated", "failed", "unsupported", "not_run_protocol_timing_pending_model_api"}
-    ).all()
+    duration = perturb[perturb["perturbation"].astype(str).str.startswith("stimulus_duration")]
+    assert not duration.empty
+    assert duration["perturbation_status"].eq("evaluated").all()
+    assert duration["simulation_status"].eq("ok").all()
+    assert "Vm_feature_pass_fraction" in perturb.columns
+    assert "hidden_flux_plausible" in perturb.columns
 
 
 def test_step06_notebook_executes_and_saves_auditable_copy(project_root):

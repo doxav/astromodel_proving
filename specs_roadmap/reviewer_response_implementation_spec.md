@@ -48,6 +48,7 @@ This table is part of the specification. It records whether the development plan
 | Parameter plausibility and constrained reruns. | Covered by Step 08. | Distinguish `within_range`, `identifiable`, and `physiologically_interpretable`; a parameter inside bounds may still be weakly identified. |
 | Population-level posterior predictive checks. | Covered by Step 06 and Step 09. | Add explicit feature-distribution posterior predictive checks for `region × condition × sweep` groups using accepted ensembles. |
 | Figures and reviewer-facing outputs. | Covered by Step 09. | Add a traceability table mapping each figure/table to reviewer critique IDs and source outputs. |
+| Integrated reviewer-response synthesis. | Covered by Step 09. | Generate R1-R7 traceability, claim-maturity, and manuscript asset tables from actual Step 00-08 outputs without upgrading unsupported biological degeneracy claims. |
 
 ## Region-aware experimental-design contract
 

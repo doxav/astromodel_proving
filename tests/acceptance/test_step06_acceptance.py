@@ -100,6 +100,16 @@ def test_step06_final_degeneracy_claim_is_never_enabled_by_default(project_root)
     assert (~robust["final_biological_degeneracy_claim_allowed"].astype(bool)).all()
 
 
+def test_step06_default_perturbations_cover_all_six_currents(project_root):
+    result = run_step06_predictive_validation(
+        project_root, Step06Config(max_candidates=1, time_points=30, write_outputs=False)
+    )
+    perturb = result["perturbation_sweeps"]
+    assert set(perturb["current_na"]) == {50, 75, 100, 125, 150, 175}
+    robust = result["robustness_summary"]
+    assert "biological_description_score" in robust.columns
+
+
 def test_step06_partial_step04_heldout_is_explicit_not_silent(project_root, tmp_path):
     result = run_step06_predictive_validation(
         project_root,

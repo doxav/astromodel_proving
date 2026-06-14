@@ -1,2 +1,2 @@
 n_representative_centers,profile_center_db,n_profile_parameters,n_fim_parameters,n_timepoints,observable_stride,runtime_seconds,claim_boundary
-3,CONTROL_75nA.db,9,9,180,2,22.27146022299894,structural-inspection screen plus local practical diagnostics; not a full symbolic STRIKE-GOLDD proof; flat/sloppy is not biological degeneracy
+3,CONTROL_75nA.db,9,9,180,2,7.785389475000557,structural-inspection screen plus local practical diagnostics; not a full symbolic STRIKE-GOLDD proof; flat/sloppy is not biological degeneracy

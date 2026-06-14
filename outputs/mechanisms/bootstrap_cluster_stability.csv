@@ -1,2 +1,9 @@
 bootstrap_iteration,n_cells,n_candidates,coassignment_stability,stability_status,stability_reason
-0,1,1,,insufficient_evidence,needs >= 6 candidates and >= 3 independent cells; observed 1 candidates and 1 cells
+1,18,1982,0.9579343826900458,stable,cell_level_resampling_against_original_centers
+2,22,2503,0.9583518163495572,stable,cell_level_resampling_against_original_centers
+3,20,2037,0.9526240002006109,stable,cell_level_resampling_against_original_centers
+4,19,2513,0.96692105509947,stable,cell_level_resampling_against_original_centers
+5,21,2004,0.9577360506146967,stable,cell_level_resampling_against_original_centers
+6,20,2283,0.9565004915730068,stable,cell_level_resampling_against_original_centers
+7,22,2312,0.9594410065296258,stable,cell_level_resampling_against_original_centers
+8,22,2630,0.951467327715001,stable,cell_level_resampling_against_original_centers

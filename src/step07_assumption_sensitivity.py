@@ -38,7 +38,8 @@ IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
 
 @dataclass(slots=True)
 class Step07Config:
-    max_candidates: int | None = 2
+    max_candidates: int | None = None
+    candidate_policy: str = "best_per_cell"
     time_points: int = 50
     t_final_ms: float = 50_000.0
     gating_families: tuple[str, ...] = GATING_FAMILIES
@@ -126,7 +127,15 @@ def _simulate_candidate(cand: Mapping[str, Any], family: str, current_na: int, c
 
 
 def load_step07_inputs(project_root: Path | str, config: Step07Config) -> pd.DataFrame:
-    candidates, _ = load_step06_inputs(project_root, Step06Config(max_candidates=config.max_candidates, time_points=config.time_points, write_outputs=False))
+    candidates, _ = load_step06_inputs(
+        project_root,
+        Step06Config(
+            max_candidates=config.max_candidates,
+            candidate_policy=config.candidate_policy,
+            time_points=config.time_points,
+            write_outputs=False,
+        ),
+    )
     required = set(IDENTITY_COLUMNS + ["region", "condition"])
     missing = sorted(required - set(candidates.columns))
     if missing:

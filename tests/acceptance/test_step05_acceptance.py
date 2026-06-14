@@ -19,6 +19,11 @@ def test_step05_writes_required_outputs_and_conservative_claims(project_root):
     )
     required_files = {
         "accepted_fit_mechanisms.csv",
+        "accepted_fit_mechanisms_windowed.csv",
+        "buffering_phenotype_tags.csv",
+        "phenotype_counts_by_region_condition_window.csv",
+        "M_mode_vector_by_configuration.csv",
+        "measure_registry_status.csv",
         "mechanism_clusters.csv",
         "representatives.csv",
         "region_mechanism_enrichment.csv",
