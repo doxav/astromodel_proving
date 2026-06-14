@@ -1171,8 +1171,38 @@ def extract_features_from_trace(
     rise_slope = _slope(rise_mask)
     decay_slope = _slope(decay_mask)
     return_slope = _slope(return_mask)
-    rise_tau = float(abs(peak / rise_slope)) if np.isfinite(rise_slope) and abs(rise_slope) > 1e-12 else np.nan
-    decay_tau = float(abs(peak / decay_slope)) if np.isfinite(decay_slope) and abs(decay_slope) > 1e-12 else np.nan
+
+    def _tau_63(lo: float, hi: float, level0: float, amp: float, rising: bool) -> float:
+        """63%-crossing time constant, consistent with extract_features().
+
+        Returns the interpolated time (relative to ``lo``) at which the
+        baseline-centred trace first reaches ``level0 +/- 0.632*amp``. This is
+        the standard first-order tau definition used to build the empirical
+        threshold table, and unlike ``peak/slope`` it is bounded and has no
+        divide-by-near-zero blow-up on flat/slow simulated traces.
+        """
+        if not (np.isfinite(amp) and amp > 0):
+            return np.nan
+        seg = (t >= lo) & (t <= hi)
+        tt = t[seg]
+        cc = centered[seg]
+        if tt.size < 2:
+            return np.nan
+        thr = level0 + (0.632 * amp if rising else -0.632 * amp)
+        hit = (cc >= thr) if rising else (cc <= thr)
+        idx = np.where(hit)[0]
+        if idx.size == 0:
+            return np.nan
+        i = int(idx[0])
+        if i == 0:
+            return float(tt[0] - lo)
+        x0, x1, y0, y1 = tt[i - 1], tt[i], cc[i - 1], cc[i]
+        tc = x0 + (thr - y0) * (x1 - x0) / (y1 - y0) if y1 != y0 else x1
+        return float(tc - lo)
+
+    rise_tau = _tau_63(onset, offset, 0.0, peak, rising=True)
+    decay_drop = (stim_end - post_min) if np.isfinite(post_min) else np.nan
+    decay_tau = _tau_63(offset, float(t[-1]), stim_end, decay_drop, rising=False)
     plateau_slope = _slope(plateau_mask)
     return {
         "baseline_mV": baseline,
