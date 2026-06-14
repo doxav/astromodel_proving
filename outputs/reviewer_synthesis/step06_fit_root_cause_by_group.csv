@@ -1,0 +1,11 @@
+mechanism_cluster,region,condition,validation_label,n_cells,holdout_pass_fraction,mean_weighted_ppc_coverage,perturbation_robust_fraction,perturbation_vm_feature_pass_fraction,hidden_flux_plausible_fraction,step06_failure_root_cause,would_more_step04_optimization_likely_fix,would_more_step06_time_resolution_likely_fix
+M1,DH,MFA,prediction_limited,2,1.0,0.4305555555555556,0.375,0.5747354497354498,1.0,perturbation_functional_robustness_limited,no,no; sensitivity did not improve support overall
+M1,DH,MFA_BA,predictive_supported,6,1.0,0.491855281207133,1.0,0.5887345679012346,1.0,currently_supported_at_canonical_resolution,maybe,no; sensitivity did not improve support overall
+M1,VH,CONTROL,prediction_limited,2,1.0,0.0814814814814814,0.0,0.1099537037037037,1.0,perturbation_functional_robustness_limited,no,no; sensitivity did not improve support overall
+M1,VH,MFA,predictive_supported,1,1.0,0.2630278526504941,0.875,0.3564401455026455,1.0,currently_supported_at_canonical_resolution,maybe,no; sensitivity did not improve support overall
+M1,VH,MFA_BA,predictive_supported,4,1.0,0.2574955908289241,0.5208333333333334,0.294973544973545,1.0,currently_supported_at_canonical_resolution,maybe,no; sensitivity did not improve support overall
+M2,DH,CONTROL,predictive_supported,7,1.0,0.3439153439153439,0.7083333333333334,0.4100529100529101,1.0,currently_supported_at_canonical_resolution,maybe,no; sensitivity did not improve support overall
+M2,DH,MFA,prediction_limited,3,1.0,0.4305555555555556,0.4166666666666667,0.5020943562610228,1.0,perturbation_functional_robustness_limited,no,no; sensitivity did not improve support overall
+M2,VH,MFA,predictive_supported,1,1.0,0.2630278526504941,0.875,0.3662781084656084,1.0,currently_supported_at_canonical_resolution,maybe,no; sensitivity did not improve support overall
+M3,DH,MFA,prediction_limited,1,1.0,0.4305555555555556,0.3541666666666667,0.501984126984127,1.0,perturbation_functional_robustness_limited,no,no; sensitivity did not improve support overall
+M3,VH,MFA_BA,prediction_limited,3,1.0,0.2574955908289241,0.4166666666666667,0.3643628747795414,1.0,perturbation_functional_robustness_limited,no,no; sensitivity did not improve support overall

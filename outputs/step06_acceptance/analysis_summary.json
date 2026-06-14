@@ -2,6 +2,7 @@
   "step_name": "Step 06 \u2014 Predictive validation and perturbation robustness",
   "config": {
     "max_candidates": 1,
+    "step04_source_path": null,
     "candidate_policy": "best_per_cell",
     "candidates_per_cell": 3,
     "time_points": 40,
@@ -44,5 +45,5 @@
     "predictive_supported"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 5.85428589899675
+  "elapsed_seconds": 5.86016557100811
 }

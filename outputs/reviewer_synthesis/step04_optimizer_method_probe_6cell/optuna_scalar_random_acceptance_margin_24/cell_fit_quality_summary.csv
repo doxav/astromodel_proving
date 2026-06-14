@@ -1,0 +1,7 @@
+file_id,region,condition,n_candidates,n_accepted_candidates,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,holdout_pass_count,holdout_mean_rmse_mV,holdout_mean_pass_fraction,cell_reviewer_facing
+1_DH_1_CONTROL,DH,CONTROL,24,0,1_DH_1_CONTROL__cand_21,14.628337995682832,0.2985936990497204,0,,,False
+1_VH_1_CONTROL,VH,CONTROL,24,0,1_VH_1_CONTROL__cand_01,7.123984275734943,0.22713657923789296,0,,,False
+DH_2_MFA,DH,MFA,24,22,DH_2_MFA__cand_10,8.849035451107993,0.39426637664582054,0,,,False
+VH_6_MFA,VH,MFA,24,2,VH_6_MFA__cand_10,5.1319704737734595,0.3256457900367577,0,,,False
+DH_1_MFA_BA,DH,MFA_BA,24,22,DH_1_MFA_BA__cand_04,7.509341015970965,0.42857142857142855,0,,,False
+VH_6_MFA_BA,VH,MFA_BA,24,22,VH_6_MFA_BA__cand_03,2.085829546271874,0.42857142857142855,0,,,False

@@ -1,0 +1,7 @@
+condition,region,n_cells,cells_with_effective_plausible,cells_with_all_audited_plausible,cells_with_2plus_effective_plausible_distinct,cells_with_2plus_all_audited_plausible_distinct,median_effective_plausible_distinct_clusters,median_all_audited_plausible_distinct_clusters
+CONTROL,DH,7,7,0,5,0,2.0,0.0
+CONTROL,VH,2,2,0,2,0,2.5,0.0
+MFA,DH,6,6,6,6,2,62.0,1.0
+MFA,VH,7,7,0,7,0,3.0,0.0
+MFA_BA,DH,6,6,6,6,0,66.5,1.0
+MFA_BA,VH,7,7,7,7,3,57.0,1.0

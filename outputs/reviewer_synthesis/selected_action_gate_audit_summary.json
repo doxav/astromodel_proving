@@ -1,0 +1,21 @@
+{
+  "step_name": "selected reviewer-response action gate audits",
+  "config": {
+    "max_candidates": null,
+    "write_outputs": true,
+    "min_reviewer_facing_cells": 3,
+    "min_holdout_pass_fraction": 0.3,
+    "min_perturbation_robust_fraction": 0.5,
+    "min_ppc_coverage": 0.3,
+    "min_homeostasis_pass_fraction": 0.5,
+    "max_proxy_limited_fraction": 0.25,
+    "max_gating_unstable_fraction": 0.25,
+    "max_split_sensitive_fraction": 0.25,
+    "all_current_time_points": 40,
+    "interpolation_time_points": 40,
+    "interpolation_points": 5
+  },
+  "n_artifacts": 24,
+  "elapsed_seconds": 50.322654105002584,
+  "claim_scope": "Derived gate audits only; stronger claims require passing integrated gates."
+}

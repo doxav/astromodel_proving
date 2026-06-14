@@ -1,0 +1,7 @@
+criterion,scope,operator,value,role
+trace_rmse_mean_mV,all6,<=,18.0,accepted_by_trace
+weighted_pass_fraction_mean,all6,>=,0.3,accepted_by_feature_contract
+heldout_trace_rmse_mV,leave_one_out,<=,20.0,heldout_screen
+heldout_weighted_pass_fraction,leave_one_out,>=,0.3,heldout_screen
+ensemble_rank,all6,<=,24.0,accepted_all6_topk
+holdout_pass_count,cell,>=,3.0,reviewer_facing_cell

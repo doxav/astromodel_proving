@@ -1,0 +1,7 @@
+file_id,region,condition,fit_scope,heldout_sweep,train_sweeps,candidate_id,optimizer_status,optimizer_success,optimizer_cost,optimizer_nfev,heldout_trace_rmse_mV,heldout_weighted_pass_fraction,simulation_health,heldout_pass
+VH_6_MFA,VH,MFA,leave_one_out,1,"2,3,4,5,6",VH_6_MFA__hybrid_optuna_943,3,True,43065.036629482514,11,1.9692168291562064,0.26179688656096417,ok,False
+VH_6_MFA,VH,MFA,leave_one_out,2,"1,3,4,5,6",VH_6_MFA__hybrid_optuna_943,3,True,43710.89655601267,12,2.729918985134286,0.3182964016773244,ok,True
+VH_6_MFA,VH,MFA,leave_one_out,3,"1,2,4,5,6",VH_6_MFA__hybrid_optuna_943,3,True,46075.958750477745,10,3.70027003198237,0.3725699059032714,ok,True
+VH_6_MFA,VH,MFA,leave_one_out,4,"1,2,3,5,6",VH_6_MFA__hybrid_optuna_943,3,True,46602.80351336788,13,4.618629475438645,0.37115633238668894,ok,True
+VH_6_MFA,VH,MFA,leave_one_out,5,"1,2,3,4,6",VH_6_MFA__hybrid_optuna_943,3,True,47140.30674680425,14,5.07592559300745,0.3465810348265305,ok,True
+VH_6_MFA,VH,MFA,leave_one_out,6,"1,2,3,4,5",VH_6_MFA__hybrid_optuna_943,3,True,48219.03167042061,15,5.429768535839799,0.3157731674871055,ok,True

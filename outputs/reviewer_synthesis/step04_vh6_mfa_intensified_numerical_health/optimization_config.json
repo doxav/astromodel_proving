@@ -1,0 +1,41 @@
+{
+  "loss_config": {
+    "binary_weight": 1.0,
+    "fail_weight": 1.0,
+    "feature_set": "primary_no_redundant",
+    "feature_weight": 1.0,
+    "hidden_weight": 0.0,
+    "multi_objective_names": [
+      "trace",
+      "feature",
+      "binary"
+    ],
+    "prior_weight": 0.0,
+    "trace": {
+      "delta_huber": 1.0,
+      "gradient_loss_weight": 20.0,
+      "loss_type": "COMBINED",
+      "reduction": "sum"
+    },
+    "trace_weight": 1.0
+  },
+  "optimization_config_hash": "e50e4e6c65dca5fd",
+  "optimizer_config": {
+    "allow_optuna_fallback": false,
+    "backend": "hybrid",
+    "candidate_top_k": 1000,
+    "holdout_backend": "least_squares",
+    "hybrid_refine_top_k": 10,
+    "hybrid_scipy_post_nfev": 120,
+    "hybrid_scipy_pre_nfev": 120,
+    "optuna_n_trials": 1000,
+    "optuna_objective": "acceptance_margin",
+    "optuna_sampler": "tpe",
+    "optuna_storage": null,
+    "optuna_study_name": null,
+    "optuna_timeout_s": null,
+    "run_holdout": true,
+    "scipy_f_scale": 1.0,
+    "scipy_loss": "linear"
+  }
+}

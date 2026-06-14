@@ -1,0 +1,2 @@
+file_id,region,condition,n_candidates,n_accepted_candidates,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,holdout_pass_count,holdout_mean_rmse_mV,holdout_mean_pass_fraction,cell_reviewer_facing
+VH_6_MFA,VH,MFA,1022,3,VH_6_MFA__hybrid_optuna_943,3.9887692014650806,0.33541547944319827,5,3.920621575093126,0.33102895480698086,True

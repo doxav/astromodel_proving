@@ -1,0 +1,7 @@
+region,condition,n_candidates,n_cells,n_phenotypes,n_mechanism_clusters,stable_phenotype_novel_count,median_min_mechanism_score_distance
+DH,CONTROL,16,7,3,2,7,5.684287362573632
+DH,MFA,18,6,4,3,10,5.036984867950228
+DH,MFA_BA,18,6,5,2,9,5.064122522973975
+VH,CONTROL,6,2,2,1,1,4.4541796929927715
+VH,MFA,20,7,4,3,5,5.025270767037589
+VH,MFA_BA,21,7,5,3,13,4.880703510624287

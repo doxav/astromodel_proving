@@ -31,6 +31,24 @@ from .contracts import protocol_condition
 
 OUTPUT_SUBDIR = "predictive_validation"
 IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
+EFFECTIVE_DIVERSITY_COLUMNS = [
+    "P_gap_eff",
+    "gamma_t_eff",
+    "gamma_s_eff",
+    "volume_ratio_wa_wo",
+]
+MECHANISM_SCORE_COLUMNS = [
+    "dKs_activation_score_mean",
+    "long_range_distribution_fraction_mean",
+    "voltage_coupling_score_mean",
+    "kir_current_score_mean",
+    "log10_recruited_surface_score",
+]
+STABLE_PHENOTYPE_LABELS = {
+    "available_surface_voltage_coupled_but_ionic_recruitment_low",
+    "mixed_local_spatial_buffering",
+    "recruited_surface_gap_assisted_buffering",
+}
 
 
 @dataclass(slots=True)
@@ -124,11 +142,114 @@ def _candidate_sort(ensemble: pd.DataFrame) -> tuple[list[str], list[bool]]:
     return sort_cols, ascending
 
 
+def _rank_candidates_by_quality(ensemble: pd.DataFrame) -> pd.DataFrame:
+    """Return candidates in stable quality order with a normalized quality score."""
+
+    sort_cols, ascending = _candidate_sort(ensemble)
+    ranked = ensemble.sort_values(sort_cols, ascending=ascending).reset_index(drop=True)
+    ranked["step06_selection_quality_order"] = np.arange(1, len(ranked) + 1)
+    if len(ranked) == 1:
+        ranked["step06_selection_quality_score"] = 1.0
+    else:
+        ranked["step06_selection_quality_score"] = 1.0 - (
+            (ranked["step06_selection_quality_order"] - 1) / (len(ranked) - 1)
+        )
+    return ranked
+
+
+def _with_mechanism_score_features(candidates: pd.DataFrame) -> pd.DataFrame:
+    """Add continuous Step 05 mechanism-score features used by diverse selection."""
+
+    out = candidates.copy()
+    gamma_s = pd.to_numeric(out.get("gamma_s_eff"), errors="coerce")
+    activation = pd.to_numeric(out.get("dKs_activation_score_mean"), errors="coerce")
+    recruited_surface = gamma_s * activation
+    out["log10_recruited_surface_score"] = np.log10(
+        np.clip(recruited_surface.to_numpy(dtype=float), 1e-12, None)
+    )
+    return out
+
+
+def _mechanism_score_matrix(candidates: pd.DataFrame) -> np.ndarray:
+    """Build a standardized matrix from log effective and continuous mechanism scores."""
+
+    source = _with_mechanism_score_features(candidates)
+    missing = sorted(set(EFFECTIVE_DIVERSITY_COLUMNS) - set(source.columns))
+    if missing:
+        raise ValueError(f"mechanism-score diverse selection is missing effective columns: {missing}")
+    feature_parts: list[pd.Series] = []
+    for column in EFFECTIVE_DIVERSITY_COLUMNS:
+        values = pd.to_numeric(source[column], errors="coerce").to_numpy(dtype=float)
+        feature_parts.append(pd.Series(np.log10(np.clip(values, 1e-300, None)), index=source.index))
+    for column in MECHANISM_SCORE_COLUMNS:
+        values = pd.to_numeric(source.get(column), errors="coerce")
+        feature_parts.append(values if isinstance(values, pd.Series) else pd.Series(np.nan, index=source.index))
+    matrix = pd.concat(feature_parts, axis=1).replace([np.inf, -np.inf], np.nan)
+    matrix = matrix.fillna(matrix.median(numeric_only=True)).fillna(0.0).to_numpy(dtype=float)
+    mean = matrix.mean(axis=0)
+    scale = matrix.std(axis=0)
+    scale[scale == 0] = 1.0
+    return (matrix - mean) / scale
+
+
+def _min_distance_to_selected(values: np.ndarray, selected: list[int], index: int) -> float:
+    """Return the minimum Euclidean distance from one candidate to selected candidates."""
+
+    if not selected:
+        return float("inf")
+    return float(min(np.linalg.norm(values[index] - values[other]) for other in selected))
+
+
+def _select_mechanism_score_diverse_candidates(ranked: pd.DataFrame, candidates_per_cell: int) -> pd.DataFrame:
+    """Select quality-seeded candidates that are diverse in effective and mechanism-score space."""
+
+    k = int(candidates_per_cell)
+    selected: list[int] = [0]
+    while len(selected) < min(k, len(ranked)):
+        values = _mechanism_score_matrix(ranked)
+        selected_labels = set(
+            ranked.iloc[selected]["buffering_phenotype"].astype(str).dropna()
+        )
+        remaining = [index for index in range(len(ranked)) if index not in selected]
+        scored = []
+        for index in remaining:
+            label = str(ranked.loc[index, "buffering_phenotype"]) if "buffering_phenotype" in ranked.columns else "unlabeled"
+            stable_novel_label = int(label in STABLE_PHENOTYPE_LABELS and label not in selected_labels)
+            scored.append(
+                (
+                    _min_distance_to_selected(values, selected, index),
+                    stable_novel_label,
+                    float(ranked.loc[index, "step06_selection_quality_score"]),
+                    -index,
+                    index,
+                )
+            )
+        selected.append(max(scored)[-1])
+    out = ranked.iloc[selected].copy().reset_index(drop=True)
+    values = _mechanism_score_matrix(out)
+    previous: list[int] = []
+    distances: list[float] = []
+    novel_flags: list[bool] = []
+    labels_seen: set[str] = set()
+    for index, row in out.iterrows():
+        distance = _min_distance_to_selected(values, previous, int(index))
+        distances.append(np.nan if not np.isfinite(distance) else distance)
+        label = str(row.get("buffering_phenotype", "unlabeled"))
+        novel_flags.append(label in STABLE_PHENOTYPE_LABELS and label not in labels_seen)
+        labels_seen.add(label)
+        previous.append(int(index))
+    out["step06_selection_policy"] = "mechanism_score_diverse_per_cell"
+    out["step06_selection_rank"] = np.arange(1, len(out) + 1)
+    out["step06_selection_min_mechanism_score_distance"] = distances
+    out["step06_selection_stable_phenotype_novel"] = novel_flags
+    return out
+
+
 def _select_step06_candidate_scope(ensemble: pd.DataFrame, config: Step06Config) -> pd.DataFrame:
     """Apply the configured candidate-scope sensitivity policy."""
 
     policy = str(config.candidate_policy)
-    valid_policies = {"all", "best_per_cell", "top_k_per_cell", "mechanism_diverse_per_cell"}
+    valid_policies = {"all", "best_per_cell", "top_k_per_cell", "mechanism_diverse_per_cell", "mechanism_score_diverse_per_cell"}
     if policy not in valid_policies:
         raise ValueError(f"candidate_policy must be one of {sorted(valid_policies)}")
     if ensemble.empty or policy == "all":
@@ -137,10 +258,15 @@ def _select_step06_candidate_scope(ensemble: pd.DataFrame, config: Step06Config)
     if candidates_per_cell < 1:
         raise ValueError("candidates_per_cell must be >= 1")
     k = 1 if policy == "best_per_cell" else candidates_per_cell
-    sort_cols, ascending = _candidate_sort(ensemble)
-    ranked = ensemble.sort_values(sort_cols, ascending=ascending).reset_index(drop=True)
+    ranked = _rank_candidates_by_quality(ensemble)
     if policy in {"best_per_cell", "top_k_per_cell"}:
         return ranked.groupby("file_id", as_index=False, dropna=False).head(k).reset_index(drop=True)
+    if policy == "mechanism_score_diverse_per_cell":
+        selected = [
+            _select_mechanism_score_diverse_candidates(group.reset_index(drop=True), k)
+            for _, group in ranked.groupby("file_id", sort=True, dropna=False)
+        ]
+        return pd.concat(selected, ignore_index=True) if selected else pd.DataFrame()
 
     if "mechanism_cluster" not in ranked.columns:
         ranked = ranked.assign(mechanism_cluster="unlabeled")
@@ -178,6 +304,11 @@ def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[
                 "cluster_claim_scope",
                 "buffering_phenotype",
                 "phenotype_claim_scope",
+                "phenotype_specificity_score",
+                "dKs_activation_score_mean",
+                "long_range_distribution_fraction_mean",
+                "voltage_coupling_score_mean",
+                "kir_current_score_mean",
             ]
         )
     ]
@@ -193,6 +324,13 @@ def load_step06_inputs(project_root: Path | str, config: Step06Config) -> tuple[
     merged["cluster_claim_scope"] = merged.get("cluster_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_label")
     merged["buffering_phenotype"] = merged.get("buffering_phenotype", pd.Series(index=merged.index, dtype=object)).fillna("unlabeled")
     merged["phenotype_claim_scope"] = merged.get("phenotype_claim_scope", pd.Series(index=merged.index, dtype=object)).fillna("missing_step05_phenotype")
+    if "phenotype_specificity_score" not in merged.columns:
+        merged["phenotype_specificity_score"] = np.nan
+    for column in MECHANISM_SCORE_COLUMNS:
+        if column == "log10_recruited_surface_score":
+            continue
+        if column not in merged.columns:
+            merged[column] = np.nan
     merged = _select_step06_candidate_scope(merged, config)
     if config.max_candidates is not None:
         merged = merged.sort_values(IDENTITY_COLUMNS).head(int(config.max_candidates)).copy()

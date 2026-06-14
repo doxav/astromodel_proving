@@ -1,0 +1,7 @@
+region,condition,n_inventory_cells,n_accepted_cells,n_reviewer_facing_cells,min_reviewer_facing_cells,n_step06_groups,n_predictive_supported_groups,n_prediction_limited_or_fit_only_groups,minimum_cell_gate,any_predictive_group_gate,all_groups_predictive_gate,support_status,allowed_claim_scope
+DH,CONTROL,7,7,7,3,1,1,0,True,True,True,all_groups_supported,region_condition_mechanism_claim_allowed
+DH,MFA,6,6,6,3,2,0,2,True,False,False,coverage_present_prediction_limited,no_region_condition_mechanism_claim
+DH,MFA_BA,6,6,6,3,1,1,0,True,True,True,all_groups_supported,region_condition_mechanism_claim_allowed
+VH,CONTROL,4,2,0,3,1,0,1,False,False,False,insufficient_reviewer_facing_cells,no_region_condition_mechanism_claim
+VH,MFA,7,7,7,3,2,0,2,True,False,False,coverage_present_prediction_limited,no_region_condition_mechanism_claim
+VH,MFA_BA,7,7,7,3,1,1,0,True,True,True,all_groups_supported,region_condition_mechanism_claim_allowed

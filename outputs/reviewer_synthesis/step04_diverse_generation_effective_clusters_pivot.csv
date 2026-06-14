@@ -1,0 +1,9 @@
+file_id,region,condition,append_all_completed_generation_strategies,append_random_plus_hybrid_random,append_random_plus_nsga2,append_random_plus_nsga2_plus_hybrid_random,baseline_hybrid_tpe_acceptance,canonical_current_full_step04_accepted_only,hybrid_random_acceptance_large_archive,least_squares_12starts_soft_l1_bounded,optuna_nsga2_multi_acceptance_archive,optuna_random_acceptance_archive,optuna_random_trace_shape_archive
+1_VH_2_CONTROL,VH,CONTROL,,,,,,3.0,,,,,
+3_DH_1_CONTROL,DH,CONTROL,6.0,4.0,5.0,5.0,1.0,2.0,1.0,,2.0,4.0,4.0
+DH_1_MFA,DH,MFA,158.0,117.0,116.0,124.0,34.0,70.0,73.0,11.0,8.0,109.0,109.0
+DH_1_MFA_BA,DH,MFA_BA,146.0,111.0,110.0,115.0,27.0,67.0,69.0,11.0,5.0,106.0,106.0
+DH_2_CONTROL,DH,CONTROL,5.0,4.0,5.0,5.0,,1.0,1.0,,2.0,4.0,4.0
+VH_1_MFA,VH,MFA,17.0,14.0,17.0,17.0,,2.0,9.0,,5.0,14.0,14.0
+VH_4_MFA_BA,VH,MFA_BA,146.0,106.0,107.0,111.0,31.0,62.0,67.0,11.0,6.0,102.0,102.0
+VH_6_MFA,VH,MFA,16.0,14.0,16.0,16.0,,3.0,9.0,,4.0,14.0,14.0

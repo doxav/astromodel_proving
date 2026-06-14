@@ -17,9 +17,10 @@
   "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
   "implementation_mode": "shared-cell least-squares fitting with multi-start and leave-one-sweep-out validation",
   "n_cells": 37,
-  "n_candidates": 6230,
-  "n_accepted_candidates": 2110,
-  "n_reviewer_facing_cells": 33,
+  "n_candidates": 5920,
+  "n_accepted_candidates": 2827,
+  "n_effective_diverse_candidates": 158,
+  "n_reviewer_facing_cells": 20,
   "selected_file_ids": [
     "1_DH_1_CONTROL",
     "1_DH_2_CONTROL",
@@ -59,19 +60,22 @@
     "VH_7_OG_MFA",
     "VH_7_OG_MFA_BA"
   ],
-  "n_fit_points": 40,
-  "n_starts": 8,
-  "cell_fit_workers": 20,
-  "cell_fit_worker_request": "auto",
-  "max_nfev_all6": 60,
+  "n_fit_points": 24,
+  "n_starts": 4,
+  "cell_fit_workers": 10,
+  "cell_fit_worker_request": 10,
+  "max_nfev_all6": 20,
   "max_nfev_holdout": 40,
   "trace_rmse_accept": 18.0,
   "feature_pass_accept": 0.3,
   "heldout_trace_rmse_accept": 20.0,
   "heldout_pass_accept": 0.3,
   "heldout_min_pass_count": 3,
-  "accepted_top_k_per_cell": 500,
-  "optimization_config_hash": "e61866f5553ad5be",
+  "accepted_top_k_per_cell": 1000,
+  "effective_diverse_candidates_per_cell": 5,
+  "effective_diverse_selection_strategy": "quality_filtered_effective_maximin",
+  "effective_diverse_distance_threshold": 0.5,
+  "optimization_config_hash": "d9da267b2046c840",
   "loss_config": {
     "trace": {
       "loss_type": "COMBINED",
@@ -93,19 +97,19 @@
     ]
   },
   "optimizer_config": {
-    "backend": "hybrid",
+    "backend": "optuna_scalar",
     "scipy_loss": "linear",
     "scipy_f_scale": 1.0,
-    "optuna_n_trials": 100,
+    "optuna_n_trials": 160,
     "optuna_timeout_s": null,
-    "optuna_sampler": "tpe",
+    "optuna_sampler": "random",
     "optuna_storage": null,
     "optuna_study_name": null,
     "optuna_objective": "acceptance_margin",
     "hybrid_scipy_pre_nfev": 40,
     "hybrid_scipy_post_nfev": 20,
     "hybrid_refine_top_k": 3,
-    "candidate_top_k": 500,
+    "candidate_top_k": 160,
     "allow_optuna_fallback": false,
     "run_holdout": true,
     "holdout_backend": "least_squares"
@@ -114,158 +118,10 @@
   "uses_region_specific_acceptance": true,
   "model_alignment": "src.astro_model.model matches the expected reviewer-facing ODE form with numerical safeguards only",
   "sqlite_database": "/home/xav/code/astromodel_proving/outputs/cell_fits/step04_cell_fits.sqlite",
-  "notebook_execution_mode": "reused_validated_completed_full_target_run",
-  "notebook_reused_source_dir": "outputs/cell_fits",
+  "notebook_execution_mode": "ran_full_target_or_explicit_user_selected_scope",
+  "notebook_selected_file_ids": null,
   "notebook_output_scope": "full_37_cell_target_scope",
-  "targeted_merge_provenance": {
-    "merge_created_at": "2026-06-14T10:51:40",
-    "merge_reason": "replace VH MFA rows with strict numerical-health high-budget Step04 fits that reached reviewer-facing holdout criteria",
-    "backup_dir": "outputs/reviewer_synthesis/cell_fits_pre_vh_mfa_targeted_merge_20260614_1048",
-    "replacement_file_ids": [
-      "VH_1_MFA",
-      "VH_2_MFA",
-      "VH_3_MFA",
-      "VH_4_MFA",
-      "VH_5_MFA",
-      "VH_6_MFA",
-      "VH_7_OG_MFA"
-    ],
-    "vh_control_status": "not_replaced; strict high-budget search did not make VH CONTROL reviewer-facing and feature-level failure indicates model/feature mismatch rather than simple budget limitation",
-    "comparison_csv": "outputs/reviewer_synthesis/step04_targeted_best_comparison.csv",
-    "merge_manifest_csv": "outputs/cell_fits/targeted_step04_merge_manifest.csv",
-    "optimization_config_hashes_present": [
-      "1710e98be83bf964",
-      "e50e4e6c65dca5fd",
-      "e61866f5553ad5be"
-    ],
-    "source_configs": {
-      "canonical_base": {
-        "loss_config": {
-          "binary_weight": 1.0,
-          "fail_weight": 1.0,
-          "feature_set": "primary_no_redundant",
-          "feature_weight": 1.0,
-          "hidden_weight": 0.0,
-          "multi_objective_names": [
-            "trace",
-            "feature",
-            "binary"
-          ],
-          "prior_weight": 0.0,
-          "trace": {
-            "delta_huber": 1.0,
-            "gradient_loss_weight": 20.0,
-            "loss_type": "COMBINED",
-            "reduction": "sum"
-          },
-          "trace_weight": 1.0
-        },
-        "optimization_config_hash": "e61866f5553ad5be",
-        "optimizer_config": {
-          "allow_optuna_fallback": false,
-          "backend": "hybrid",
-          "candidate_top_k": 500,
-          "holdout_backend": "least_squares",
-          "hybrid_refine_top_k": 3,
-          "hybrid_scipy_post_nfev": 20,
-          "hybrid_scipy_pre_nfev": 40,
-          "optuna_n_trials": 100,
-          "optuna_objective": "acceptance_margin",
-          "optuna_sampler": "tpe",
-          "optuna_storage": null,
-          "optuna_study_name": null,
-          "optuna_timeout_s": null,
-          "run_holdout": true,
-          "scipy_f_scale": 1.0,
-          "scipy_loss": "linear"
-        }
-      },
-      "vh_mfa_high_budget_v2": {
-        "loss_config": {
-          "binary_weight": 1.0,
-          "fail_weight": 1.0,
-          "feature_set": "primary_no_redundant",
-          "feature_weight": 1.0,
-          "hidden_weight": 0.0,
-          "multi_objective_names": [
-            "trace",
-            "feature",
-            "binary"
-          ],
-          "prior_weight": 0.0,
-          "trace": {
-            "delta_huber": 1.0,
-            "gradient_loss_weight": 20.0,
-            "loss_type": "COMBINED",
-            "reduction": "sum"
-          },
-          "trace_weight": 1.0
-        },
-        "optimization_config_hash": "1710e98be83bf964",
-        "optimizer_config": {
-          "allow_optuna_fallback": false,
-          "backend": "hybrid",
-          "candidate_top_k": 500,
-          "holdout_backend": "least_squares",
-          "hybrid_refine_top_k": 5,
-          "hybrid_scipy_post_nfev": 60,
-          "hybrid_scipy_pre_nfev": 80,
-          "optuna_n_trials": 300,
-          "optuna_objective": "acceptance_margin",
-          "optuna_sampler": "tpe",
-          "optuna_storage": null,
-          "optuna_study_name": null,
-          "optuna_timeout_s": null,
-          "run_holdout": true,
-          "scipy_f_scale": 1.0,
-          "scipy_loss": "linear"
-        }
-      },
-      "vh6_mfa_intensified": {
-        "loss_config": {
-          "binary_weight": 1.0,
-          "fail_weight": 1.0,
-          "feature_set": "primary_no_redundant",
-          "feature_weight": 1.0,
-          "hidden_weight": 0.0,
-          "multi_objective_names": [
-            "trace",
-            "feature",
-            "binary"
-          ],
-          "prior_weight": 0.0,
-          "trace": {
-            "delta_huber": 1.0,
-            "gradient_loss_weight": 20.0,
-            "loss_type": "COMBINED",
-            "reduction": "sum"
-          },
-          "trace_weight": 1.0
-        },
-        "optimization_config_hash": "e50e4e6c65dca5fd",
-        "optimizer_config": {
-          "allow_optuna_fallback": false,
-          "backend": "hybrid",
-          "candidate_top_k": 1000,
-          "holdout_backend": "least_squares",
-          "hybrid_refine_top_k": 10,
-          "hybrid_scipy_post_nfev": 120,
-          "hybrid_scipy_pre_nfev": 120,
-          "optuna_n_trials": 1000,
-          "optuna_objective": "acceptance_margin",
-          "optuna_sampler": "tpe",
-          "optuna_storage": null,
-          "optuna_study_name": null,
-          "optuna_timeout_s": null,
-          "run_holdout": true,
-          "scipy_f_scale": 1.0,
-          "scipy_loss": "linear"
-        }
-      }
-    }
-  },
-  "n_effective_diverse_candidates": 97,
-  "effective_diverse_candidates_per_cell": 3,
-  "effective_diverse_selection_strategy": "quality_filtered_effective_maximin",
-  "effective_diverse_distance_threshold": 0.5
+  "notebook_generation_preset": "random_acceptance_160_archive",
+  "notebook_expected_optimization_config_hash": "d9da267b2046c840",
+  "notebook_reviewer_holdout_enabled": true
 }

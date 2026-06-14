@@ -115,6 +115,20 @@ def test_step06_mechanism_diverse_policy_uses_one_candidate_per_cell_mechanism(p
     assert per_cell_mechanism_counts.le(1).all()
 
 
+def test_step06_mechanism_score_diverse_policy_uses_continuous_score_selection(project_root):
+    candidates, _ = load_step06_inputs(
+        project_root,
+        Step06Config(candidate_policy="mechanism_score_diverse_per_cell", candidates_per_cell=3),
+    )
+
+    per_cell_counts = candidates.groupby("file_id", dropna=False).size()
+    assert per_cell_counts.le(3).all()
+    assert per_cell_counts.gt(1).any()
+    assert "step06_selection_min_mechanism_score_distance" in candidates.columns
+    assert "step06_selection_stable_phenotype_novel" in candidates.columns
+    assert candidates.groupby("file_id", dropna=False)["step06_selection_rank"].min().eq(1).all()
+
+
 def test_step06_can_read_effective_diverse_step04_source(project_root):
     source_path = project_root / "outputs" / "cell_fits" / "effective_diverse_cell_ensembles.csv"
     if not source_path.exists():

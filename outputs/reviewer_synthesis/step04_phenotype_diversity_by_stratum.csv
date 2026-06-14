@@ -1,0 +1,7 @@
+region,condition,cells,cells_2plus_phenotypes,median_phenotypes,cells_2plus_mechanism_clusters,median_mechanism_clusters
+DH,CONTROL,7,2,1.0,6,2.0
+DH,MFA,6,6,5.0,6,3.0
+DH,MFA_BA,6,6,5.0,6,3.0
+VH,CONTROL,2,1,1.5,0,1.0
+VH,MFA,7,4,2.0,5,2.0
+VH,MFA_BA,7,7,5.0,7,3.0

@@ -1,0 +1,7 @@
+condition,region,n_cells,n_cells_with_accepted,n_cells_with_plausible,n_cells_with_2plus_plausible_distinct,median_plausible_distinct_clusters_0p5dex,max_plausible_pairwise_log10_distance
+CONTROL,DH,7,7,0,0,0.0,
+CONTROL,VH,2,2,0,0,0.0,
+MFA,DH,6,6,6,2,1.0,6.452518823052736
+MFA,VH,7,7,0,0,0.0,
+MFA_BA,DH,6,6,6,0,1.0,0.4827812053804836
+MFA_BA,VH,7,7,7,3,1.0,4.443597876349683

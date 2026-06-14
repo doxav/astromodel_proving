@@ -1,0 +1,16 @@
+[
+  {
+    "method": "optuna_multi_nsga2_24",
+    "seconds": 22.523029565811157,
+    "cells": 6,
+    "accepted_candidates": 18,
+    "cells_with_accepted": 4
+  },
+  {
+    "method": "optuna_scalar_random_acceptance_margin_24",
+    "seconds": 42.432512283325195,
+    "cells": 6,
+    "accepted_candidates": 68,
+    "cells_with_accepted": 4
+  }
+]

@@ -1,0 +1,4 @@
+strategy,actions_covered,description,scientific_strength,runtime_risk,claim_risk,selected,selection_reason
+current_output_gate_join,phase_1,Reuse Step04-08 outputs to build explicit support/blocker gates without any new simulations.,high_for_traceability_medium_for_new_support,low,low,True,Best first pass because every result is auditable and cannot overfit new analyses.
+modest_no_optimizer_sensitivity,phase_2,Run bounded resimulation or threshold sweeps without Step04 refitting.,medium,medium,low_medium,True,Improves evidence on label stability and assumptions while preserving notebook runtime.
+full_refit_or_new_structural_model,future_phase_3,"Rerun constrained fits, alternative gating refits, explicit ECS variants, or omitted-process models.",highest_if_successful,high,medium_high,False,Deferred because it can break runtime and should be targeted after current gates identify promising strata.

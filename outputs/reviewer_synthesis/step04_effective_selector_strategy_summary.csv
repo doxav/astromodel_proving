@@ -1,0 +1,6 @@
+selection_strategy,n_rows,n_cells,n_reviewer_facing_cells,cells_with_2plus_selected,cells_with_3plus_selected,cells_2plus_clusters_t0_5,reviewer_cells_2plus_clusters_t0_5,median_min_pairwise_effective_log_distance,p10_min_pairwise_effective_log_distance,median_effective_clusters_t0_5,mean_selected_trace_rmse_mV,mean_selected_weighted_pass_fraction,cells_retaining_rank1
+effective_maximin_best_seed,97,35,33,33,29,33,31,4.897903635272086,0.9209294120142375,3.0,6.271137087569301,0.40144172609750683,22
+weighted_effective_novelty_quality,97,35,33,33,29,33,31,4.886970255324675,0.9209294120142375,3.0,6.334491160788981,0.4035974947656606,22
+quality_filtered_effective_maximin,97,35,33,33,29,33,31,3.9627694252585797,0.9209294120142375,3.0,6.35385729321377,0.40502333410671526,22
+effective_cluster_medoids_t0_5,97,35,33,33,29,33,31,2.122473025223047,0.8410523697402323,3.0,6.311217993683214,0.408920904087714,24
+quality_top_k,97,35,33,33,29,33,31,1.266389245328794,0.0,2.0,6.503198392664648,0.41092783715425646,27

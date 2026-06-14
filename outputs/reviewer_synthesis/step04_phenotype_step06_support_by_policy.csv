@@ -1,0 +1,16 @@
+candidate_policy,buffering_phenotype,n_group_rows,predictive_supported_rows,mean_biological_description_score,mean_perturbation_robust_fraction,total_candidates,total_cells
+best_per_cell,available_surface_voltage_coupled_but_ionic_recruitment_low,3,1,0.6662720750165635,0.5,15,15
+best_per_cell,kir_dominant_local_buffering,6,1,0.5709249286134207,0.26587301587301587,22,22
+best_per_cell,low_recruitment_local_storage,3,2,0.6089178109515411,0.4449404761904761,16,16
+best_per_cell,mixed_local_spatial_buffering,3,1,0.6003395061728395,0.39236111111111116,11,11
+best_per_cell,recruited_surface_gap_assisted_buffering,2,2,0.7198302906553569,0.7559523809523809,13,13
+mechanism_diverse_per_cell,available_surface_voltage_coupled_but_ionic_recruitment_low,7,4,0.6645776376092577,0.5359268707482993,41,41
+mechanism_diverse_per_cell,kir_dominant_local_buffering,8,3,0.6008073536341835,0.35670882936507936,39,39
+mechanism_diverse_per_cell,low_recruitment_local_storage,9,7,0.6766906602897688,0.6030643738977072,50,50
+mechanism_diverse_per_cell,mixed_local_spatial_buffering,11,8,0.6851311726763667,0.6070977633477633,66,66
+mechanism_diverse_per_cell,recruited_surface_gap_assisted_buffering,3,3,0.7308766104750086,0.7572751322751322,19,19
+top_k_per_cell,available_surface_voltage_coupled_but_ionic_recruitment_low,8,6,0.6752664554011762,0.6188802083333333,75,38
+top_k_per_cell,kir_dominant_local_buffering,7,3,0.5745266608627578,0.31237953514739225,63,28
+top_k_per_cell,low_recruitment_local_storage,6,4,0.6359425942158986,0.5193149250440917,45,28
+top_k_per_cell,mixed_local_spatial_buffering,9,6,0.6572874331107234,0.5367798353909464,74,40
+top_k_per_cell,recruited_surface_gap_assisted_buffering,3,2,0.7007298018944662,0.6399305555555556,36,14
