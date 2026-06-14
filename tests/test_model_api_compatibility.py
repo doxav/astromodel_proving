@@ -6,6 +6,7 @@ from src.astro_model import (
     compute_rhs_and_currents,
     model,
     model_alignment_probe,
+    simulate_odeint,
     simulate_voltage_trace,
 )
 
@@ -52,3 +53,30 @@ def test_simulate_voltage_trace_supports_both_call_orders():
     assert a.shape == t.shape
     assert np.allclose(a, b)
     assert set(VALID_CURRENTS) == {50, 75, 100, 125, 150, 175}
+
+
+def test_simulate_odeint_honors_protocol_timing_override():
+    params = {
+        "gki": 10.0,
+        "pk": 1e-4,
+        "d": 2.0,
+        "gt": 5.0,
+        "gs": 7.0,
+        "wo": 1500.0,
+        "eps": 1e-3,
+        "gl_a": 0.01,
+        "zth": 0.2,
+        "zs": 0.05,
+    }
+    sim = simulate_odeint(
+        params,
+        {
+            "experiment_type": "CONTROL",
+            "current_na": 100,
+            "t_eval_ms": np.linspace(0.0, 40_000.0, 5),
+            "stim_onset_ms": 21_100.0,
+            "stim_offset_ms": 41_100.0,
+        },
+        t_eval_ms=np.linspace(0.0, 40_000.0, 5),
+    )
+    assert np.allclose(sim["params"]["external"]["K_bath"]["time"], [0.0, 21_100.0, 41_100.0])

@@ -1,0 +1,6 @@
+candidate_pool,rows,accepted_all6_rows,min_mean_trace_rmse_mV,median_mean_trace_rmse_mV,max_mean_weighted_pass_fraction,median_mean_weighted_pass_fraction,candidate_rows_mean_rmse_le_0_9,candidate_rows_mean_feature_ge_0_5,candidate_rows_both_mean_contract
+focus::nsga2_trace_feature_160_archive,76,54,1.302267340612378,4.88379273782307,0.9873837485203786,0.3648050648867905,0,24,0
+focus::nsga2_trace_feature_adaptive_500,161,132,1.3302446363947675,3.896167237163709,0.704967090676276,0.3816849755130822,0,65,0
+focus::nsga2_multi_160_archive,113,76,1.302267340612378,5.344536098872328,0.9873837485203786,0.3665106464030007,0,35,0
+focus::random_acceptance_160_archive,1920,1105,1.2609357085966968,7.2764733964440556,0.9270096105255844,0.33758644365781765,0,195,0
+hardening::tight_contract_adaptive_500,161,0,1.3302446363947675,3.896167237163709,0.704967090676276,0.3816849755130822,0,65,0

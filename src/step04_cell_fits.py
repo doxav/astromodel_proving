@@ -15,7 +15,16 @@ from scipy.optimize import least_squares
 
 from .astro_model import DEFAULT_Z0, normalize_trace_for_target_mode, simulate_odeint
 from .atf_io import load_all_cells, load_cell_protocol, canonical_file_id
-from .atf_features import FEATURE_COLUMNS, build_feature_table, compute_feature_reliability, build_threshold_table, extract_features_from_trace
+from .atf_features import (
+    FEATURE_COLUMNS,
+    build_feature_table,
+    build_threshold_table,
+    compute_feature_reliability,
+    extract_features_from_trace,
+    get_sweep_map,
+    parse_atf,
+    pick_step_source,
+)
 from .feature_contracts import feature_residual_vector, score_feature_contract
 from .effective_candidate_selection import (
     select_effective_diverse_candidates,
@@ -101,6 +110,9 @@ class SweepTrace:
     vm_fit: np.ndarray
     time_s_full: np.ndarray
     vm_full: np.ndarray
+    stim_onset_s: float = math.nan
+    stim_offset_s: float = math.nan
+    step_source: str = "unknown"
 
 
 @dataclass
@@ -273,6 +285,37 @@ def _safe_downsample_trace(time_s: np.ndarray, vm: np.ndarray, n_points: int) ->
     return target_time_s * 1000.0, target_vm
 
 
+def _detect_atf_step_timing(path: Path, condition: str) -> tuple[str, float, float]:
+    """Detect command-step onset/offset timing from an ATF file."""
+
+    parsed = parse_atf(path)
+    step_source, onset_s, offset_s = pick_step_source(parsed, get_sweep_map(parsed))
+    if not (np.isfinite(onset_s) and np.isfinite(offset_s) and onset_s < offset_s):
+        default_onset = _default_onset_s(condition)
+        raise ValueError(
+            f"Invalid detected step timing for {path.name}: onset={onset_s!r}, offset={offset_s!r}, "
+            f"default_onset={default_onset!r}"
+        )
+    return str(step_source), float(onset_s), float(offset_s)
+
+
+def _simulation_protocol_for_sweep(sweep_trace: SweepTrace) -> dict[str, Any]:
+    """Build a model protocol using the detected ATF stimulus timing."""
+
+    onset_s = float(sweep_trace.stim_onset_s)
+    offset_s = float(sweep_trace.stim_offset_s)
+    if not (np.isfinite(onset_s) and np.isfinite(offset_s) and onset_s < offset_s):
+        onset_s = _default_onset_s(sweep_trace.condition)
+        offset_s = onset_s + 20.0
+    return {
+        "experiment_type": sweep_trace.condition,
+        "current_na": int(sweep_trace.current_na),
+        "t_eval_ms": sweep_trace.time_ms_fit,
+        "stim_onset_ms": onset_s * 1000.0,
+        "stim_offset_ms": offset_s * 1000.0,
+    }
+
+
 def build_cell_trace_inventory(atf_dir: str | Path, n_fit_points: int = N_FIT_POINTS_DEFAULT, file_ids: Optional[Sequence[str]] = None) -> dict[str, dict[int, SweepTrace]]:
     inventory: dict[str, dict[int, SweepTrace]] = {}
     wanted = set(file_ids) if file_ids is not None else None
@@ -282,6 +325,7 @@ def build_cell_trace_inventory(atf_dir: str | Path, n_fit_points: int = N_FIT_PO
         if wanted is not None and fid not in wanted:
             continue
         cell = load_cell_protocol(Path(path))
+        step_source, stim_onset_s, stim_offset_s = _detect_atf_step_timing(Path(path), cell.condition)
         out: dict[int, SweepTrace] = {}
         for sweep in cell.sweeps:
             time_ms_fit, vm_fit = _safe_downsample_trace(np.asarray(sweep.time_s, dtype=float), np.asarray(sweep.vm_mV, dtype=float), n_fit_points)
@@ -295,6 +339,9 @@ def build_cell_trace_inventory(atf_dir: str | Path, n_fit_points: int = N_FIT_PO
                 vm_fit=vm_fit,
                 time_s_full=np.asarray(sweep.time_s, dtype=float),
                 vm_full=np.asarray(sweep.vm_mV, dtype=float),
+                stim_onset_s=stim_onset_s,
+                stim_offset_s=stim_offset_s,
+                step_source=step_source,
             )
         inventory[cell.file_id] = out
     return inventory
@@ -309,6 +356,14 @@ def _baseline_subtract(trace: np.ndarray, time_ms: np.ndarray, onset_s: float) -
     """Backward-compatible wrapper around :func:`trace_utils.baseline_center`."""
 
     return baseline_center(np.asarray(time_ms, dtype=float) / 1000.0, trace, onset_s, include_endpoint=True)
+
+
+def _baseline_level_mV(trace: np.ndarray, time_ms: np.ndarray, onset_s: float) -> float:
+    """Return the baseline level subtracted by :func:`_baseline_subtract`."""
+
+    values = np.asarray(trace, dtype=float)
+    centered = _baseline_subtract(values, time_ms, onset_s)
+    return float(np.nanmedian(values - centered))
 
 
 def _threshold_row(thresholds_df: pd.DataFrame, region: str, condition: str, sweep: int, feature: str) -> pd.Series:
@@ -570,7 +625,7 @@ def _params_from_x(condition: str, x: np.ndarray, seed_source: str, start_label:
 
 
 def _simulate_sweep(params: Mapping[str, Any], sweep_trace: SweepTrace) -> tuple[np.ndarray, dict[str, Any], float]:
-    protocol = {"experiment_type": sweep_trace.condition, "current_na": sweep_trace.current_na, "t_eval_ms": sweep_trace.time_ms_fit}
+    protocol = _simulation_protocol_for_sweep(sweep_trace)
     sim = simulate_odeint(
         params,
         protocol,
@@ -580,8 +635,14 @@ def _simulate_sweep(params: Mapping[str, Any], sweep_trace: SweepTrace) -> tuple
         fail_on_warning=True,
     )
     sim_vm = np.asarray(sim["Vm"], dtype=float)
-    sim_features = extract_features_from_trace(sweep_trace.time_ms_fit / 1000.0, sim_vm)
-    onset_s = float(sim_features.get("stim_onset_s", _default_onset_s(sweep_trace.condition)))
+    onset_s = float(protocol["stim_onset_ms"]) / 1000.0
+    offset_s = float(protocol["stim_offset_ms"]) / 1000.0
+    sim_features = extract_features_from_trace(
+        sweep_trace.time_ms_fit / 1000.0,
+        sim_vm,
+        onset_s=onset_s,
+        offset_s=offset_s,
+    )
     return sim_vm, sim_features, onset_s
 
 
@@ -665,6 +726,11 @@ def _score_candidate_metrics(params: Mapping[str, Any], trace_inventory: Mapping
                 "has_undershoot_sim": False,
             }
         row.update({"sweep": int(sweep_idx), "current_na": int(sweep_trace.current_na), "region": sweep_trace.region, "condition": sweep_trace.condition})
+        row.update({
+            "stim_onset_s": float(sweep_trace.stim_onset_s),
+            "stim_offset_s": float(sweep_trace.stim_offset_s),
+            "step_source": sweep_trace.step_source,
+        })
         rows.append(row)
     df = pd.DataFrame(rows).sort_values("sweep").reset_index(drop=True)
     n_failures = int((df["simulation_health"] != "ok").sum())
@@ -788,9 +854,7 @@ def _trace_shape_objective_components_from_x(
         sweep_trace = trace_inventory[sweep_idx]
         try:
             protocol = {
-                "experiment_type": sweep_trace.condition,
-                "current_na": sweep_trace.current_na,
-                "t_eval_ms": sweep_trace.time_ms_fit,
+                **_simulation_protocol_for_sweep(sweep_trace),
             }
             sim = simulate_odeint(
                 params,
@@ -803,7 +867,7 @@ def _trace_shape_objective_components_from_x(
             sim_vm = np.asarray(sim["Vm"], dtype=float)
             if not np.isfinite(sim_vm).all():
                 raise ValueError("non-finite simulated voltage trace")
-            onset_s = _default_onset_s(sweep_trace.condition)
+            onset_s = float(protocol["stim_onset_ms"]) / 1000.0
             exp_bs = _baseline_subtract(sweep_trace.vm_fit, sweep_trace.time_ms_fit, onset_s) / trace_scale
             sim_bs = _baseline_subtract(sim_vm, sweep_trace.time_ms_fit, onset_s) / trace_scale
             exp_obj = _transform_trace_for_objective(exp_bs, target_mean_mode)
@@ -1817,7 +1881,7 @@ def build_candidate_overlay_frame(candidate_row: Mapping[str, Any], trace_invent
         try:
             sim = simulate_odeint(
                 params,
-                {"experiment_type": sweep_trace.condition, "current_na": sweep_trace.current_na, "t_eval_ms": sweep_trace.time_ms_fit},
+                _simulation_protocol_for_sweep(sweep_trace),
                 z0=DEFAULT_Z0,
                 t_eval_ms=sweep_trace.time_ms_fit,
                 return_hidden=False,
@@ -1828,7 +1892,20 @@ def build_candidate_overlay_frame(candidate_row: Mapping[str, Any], trace_invent
         except Exception:
             sim_vm = np.full_like(sweep_trace.vm_fit, np.nan, dtype=float)
             sim_health = "failed"
-        for t_ms, obs_vm, pred_vm in zip(sweep_trace.time_ms_fit, sweep_trace.vm_fit, sim_vm):
+        onset_s = float(sweep_trace.stim_onset_s)
+        obs_centered = _baseline_subtract(sweep_trace.vm_fit, sweep_trace.time_ms_fit, onset_s)
+        pred_centered = _baseline_subtract(sim_vm, sweep_trace.time_ms_fit, onset_s)
+        obs_baseline_mV = _baseline_level_mV(sweep_trace.vm_fit, sweep_trace.time_ms_fit, onset_s)
+        pred_baseline_mV = _baseline_level_mV(sim_vm, sweep_trace.time_ms_fit, onset_s)
+        pred_aligned_mV = pred_centered + obs_baseline_mV
+        for t_ms, obs_vm, pred_vm, obs_centered_vm, pred_centered_vm, pred_aligned_vm in zip(
+            sweep_trace.time_ms_fit,
+            sweep_trace.vm_fit,
+            sim_vm,
+            obs_centered,
+            pred_centered,
+            pred_aligned_mV,
+        ):
             rows.append({
                 "file_id": file_id,
                 "region": sweep_trace.region,
@@ -1839,6 +1916,15 @@ def build_candidate_overlay_frame(candidate_row: Mapping[str, Any], trace_invent
                 "time_ms": float(t_ms),
                 "vm_observed_mV": float(obs_vm),
                 "vm_predicted_mV": float(pred_vm) if np.isfinite(pred_vm) else np.nan,
+                "vm_observed_centered_mV": float(obs_centered_vm) if np.isfinite(obs_centered_vm) else np.nan,
+                "vm_predicted_centered_mV": float(pred_centered_vm) if np.isfinite(pred_centered_vm) else np.nan,
+                "vm_observed_baseline_mV": obs_baseline_mV,
+                "vm_predicted_baseline_mV": pred_baseline_mV,
+                "vm_predicted_baseline_aligned_mV": float(pred_aligned_vm) if np.isfinite(pred_aligned_vm) else np.nan,
+                "vm_baseline_delta_pred_minus_obs_mV": pred_baseline_mV - obs_baseline_mV,
+                "stim_onset_s": float(sweep_trace.stim_onset_s),
+                "stim_offset_s": float(sweep_trace.stim_offset_s),
+                "step_source": sweep_trace.step_source,
                 "simulation_health": sim_health,
             })
     return pd.DataFrame(rows)
@@ -2113,7 +2199,15 @@ def run_step04_cell_specific_six_sweep_fitting(
     )
     contract_df = acceptance_contract_table(cfg)
     inventory_df = pd.DataFrame([
-        {"file_id": fid, "region": next(iter(sweeps.values())).region, "condition": next(iter(sweeps.values())).condition, "n_sweeps": len(sweeps)}
+        {
+            "file_id": fid,
+            "region": next(iter(sweeps.values())).region,
+            "condition": next(iter(sweeps.values())).condition,
+            "n_sweeps": len(sweeps),
+            "stim_onset_s": float(next(iter(sweeps.values())).stim_onset_s),
+            "stim_offset_s": float(next(iter(sweeps.values())).stim_offset_s),
+            "step_source": next(iter(sweeps.values())).step_source,
+        }
         for fid, sweeps in trace_inventory.items()
     ]).sort_values(["condition", "region", "file_id"]).reset_index(drop=True) if trace_inventory else pd.DataFrame()
 

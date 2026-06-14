@@ -55,11 +55,18 @@ def test_step04_simulation_uses_strict_solver_warning_policy(monkeypatch: pytest
         **kwargs: Any,
     ) -> dict[str, Any]:
         captured_kwargs.update(kwargs)
+        captured_kwargs["protocol"] = dict(protocol)
         t_eval_ms = np.asarray(kwargs["t_eval_ms"], dtype=float)
         return {"Vm": np.linspace(-80.0, -75.0, len(t_eval_ms), dtype=float)}
 
-    def fake_extract_features_from_trace(time_s: np.ndarray, vm_mV: np.ndarray) -> dict[str, float]:
-        return {"stim_onset_s": 10.0}
+    def fake_extract_features_from_trace(
+        time_s: np.ndarray,
+        vm_mV: np.ndarray,
+        *,
+        onset_s: float | None = None,
+        offset_s: float | None = None,
+    ) -> dict[str, float]:
+        return {"stim_onset_s": float(onset_s), "stim_offset_s": float(offset_s)}
 
     monkeypatch.setattr(step04_cell_fits, "simulate_odeint", fake_simulate_odeint)
     monkeypatch.setattr(step04_cell_fits, "extract_features_from_trace", fake_extract_features_from_trace)
@@ -74,12 +81,55 @@ def test_step04_simulation_uses_strict_solver_warning_policy(monkeypatch: pytest
         vm_fit=np.linspace(-80.0, -74.0, len(time_ms), dtype=float),
         time_s_full=time_ms / 1000.0,
         vm_full=np.linspace(-80.0, -74.0, len(time_ms), dtype=float),
+        stim_onset_s=10.0,
+        stim_offset_s=30.0,
+        step_source="synthetic",
     )
 
     _, _, onset_s = step04_cell_fits._simulate_sweep({}, sweep_trace)
 
     assert captured_kwargs["fail_on_warning"] is True
+    assert captured_kwargs["protocol"]["stim_onset_ms"] == pytest.approx(10_000.0)
+    assert captured_kwargs["protocol"]["stim_offset_ms"] == pytest.approx(30_000.0)
     assert onset_s == pytest.approx(10.0)
+
+
+def test_candidate_overlay_exposes_baseline_aligned_trace(monkeypatch: pytest.MonkeyPatch) -> None:
+    time_ms = np.array([0.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0])
+    observed_vm = np.array([-60.0, -60.0, -60.0, -60.0, -60.0, -55.0, -55.0])
+    predicted_vm = np.array([-90.0, -90.0, -90.0, -90.0, -90.0, -85.0, -85.0])
+    sweep_trace = SweepTrace(
+        file_id="synthetic_cell",
+        region="VH",
+        condition="CONTROL",
+        sweep=1,
+        current_na=50,
+        time_ms_fit=time_ms,
+        vm_fit=observed_vm,
+        time_s_full=time_ms / 1000.0,
+        vm_full=observed_vm,
+        stim_onset_s=5.0,
+        stim_offset_s=6.0,
+        step_source="synthetic",
+    )
+
+    def fake_simulate_odeint(*args: Any, **kwargs: Any) -> dict[str, np.ndarray]:
+        return {"Vm": predicted_vm}
+
+    monkeypatch.setattr(step04_cell_fits, "reconstruct_candidate_params", lambda candidate_row: {})
+    monkeypatch.setattr(step04_cell_fits, "simulate_odeint", fake_simulate_odeint)
+
+    overlay = step04_cell_fits.build_candidate_overlay_frame(
+        {"file_id": "synthetic_cell", "candidate_id": "synthetic_candidate"},
+        {"synthetic_cell": {1: sweep_trace}},
+    )
+
+    assert overlay["vm_observed_baseline_mV"].iloc[0] == pytest.approx(-60.0)
+    assert overlay["vm_predicted_baseline_mV"].iloc[0] == pytest.approx(-90.0)
+    assert overlay["vm_baseline_delta_pred_minus_obs_mV"].iloc[0] == pytest.approx(-30.0)
+    assert overlay.loc[overlay["time_ms"] == 5000.0, "vm_observed_centered_mV"].iloc[0] == pytest.approx(5.0)
+    assert overlay.loc[overlay["time_ms"] == 5000.0, "vm_predicted_centered_mV"].iloc[0] == pytest.approx(5.0)
+    assert overlay.loc[overlay["time_ms"] == 5000.0, "vm_predicted_baseline_aligned_mV"].iloc[0] == pytest.approx(-55.0)
 
 
 def test_step04_residual_vector_keeps_fixed_length_when_simulation_fails(

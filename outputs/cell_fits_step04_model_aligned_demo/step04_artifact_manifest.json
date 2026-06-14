@@ -4,6 +4,8 @@
     "accepted_ensembles": "accepted_cell_ensembles.csv",
     "analysis_summary": "analysis_summary.json",
     "candidates": "cell_fit_candidates.csv",
+    "effective_diverse_ensembles": "effective_diverse_cell_ensembles.csv",
+    "effective_diverse_selection_summary": "effective_diverse_selection_summary.csv",
     "heldout_screen": "heldout_current_screen.csv",
     "optimization_config": "optimization_config.json",
     "quality_summary": "cell_fit_quality_summary.csv",
@@ -12,14 +14,8 @@
     "trace_inventory": "cell_trace_inventory.csv"
   },
   "missing_artifacts": [],
-  "optimization_config_hash": "e61866f5553ad5be",
-  "optimization_config_hashes_present": [
-    "1710e98be83bf964",
-    "e50e4e6c65dca5fd",
-    "e61866f5553ad5be"
-  ],
+  "optimization_config_hash": "7a74a72572fc5320",
   "output_dir": "/home/xav/code/astromodel_proving/outputs/cell_fits",
   "output_schema_version": "step04_cell_fits_v2",
-  "step": "step04",
-  "targeted_merge_manifest": "targeted_step04_merge_manifest.csv"
+  "step": "step04"
 }

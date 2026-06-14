@@ -1,2 +1,2 @@
-file_id,region,condition,n_sweeps
-1_DH_1_CONTROL,DH,CONTROL,6
+file_id,region,condition,n_sweeps,stim_onset_s,stim_offset_s,step_source
+1_DH_1_CONTROL,DH,CONTROL,6,11.166,31.116,IP_curr

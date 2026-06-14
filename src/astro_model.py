@@ -136,12 +136,56 @@ def build_paramdict(experiment_type: str, current_na: int, flat_params: Mapping[
     }
 
 
+def _protocol_kbath_times_ms(protocol: Mapping[str, Any]) -> np.ndarray | None:
+    """Return validated K-bath timing overrides from a simulation protocol."""
+
+    if protocol.get("k_bath_time_ms") is not None:
+        times = np.asarray(protocol["k_bath_time_ms"], dtype=float)
+    elif protocol.get("stim_onset_ms") is not None and protocol.get("stim_offset_ms") is not None:
+        times = np.asarray(
+            [0.0, float(protocol["stim_onset_ms"]), float(protocol["stim_offset_ms"])],
+            dtype=float,
+        )
+    else:
+        return None
+    if times.shape != (3,):
+        raise ValueError("K-bath timing override must contain exactly three times: baseline, onset, offset")
+    if not np.isfinite(times).all():
+        raise ValueError("K-bath timing override contains non-finite values")
+    if not (times[0] <= times[1] < times[2]):
+        raise ValueError("K-bath timing override must satisfy baseline <= onset < offset")
+    return times
+
+
+def _apply_protocol_timing_overrides(
+    paramdict: Dict[str, Dict[str, Any]],
+    protocol: Optional[Mapping[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Apply optional protocol-specific K-bath timing to a parameter dictionary."""
+
+    if protocol is None:
+        return paramdict
+    times = _protocol_kbath_times_ms(protocol)
+    if times is None:
+        return paramdict
+    n_values = len(np.asarray(paramdict["external"]["K_bath"]["value"], dtype=float))
+    if n_values != len(times):
+        raise ValueError(f"K-bath timing override has {len(times)} times for {n_values} K-bath values")
+    paramdict["external"]["K_bath"]["time"] = times
+    return paramdict
+
+
 def _ensure_paramdict(params: Mapping[str, Any], protocol: Optional[Mapping[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
     if "Astrocyte" in params and "external" in params:
-        return deepcopy(params)  # type: ignore[arg-type]
+        return _apply_protocol_timing_overrides(deepcopy(params), protocol)  # type: ignore[arg-type]
     if protocol is None:
         raise ValueError("Flat parameters require protocol with experiment_type and current_na")
-    return build_paramdict(str(protocol.get("experiment_type", protocol.get("condition", "CONTROL"))), int(protocol.get("current_na", 100)), params)
+    paramdict = build_paramdict(
+        str(protocol.get("experiment_type", protocol.get("condition", "CONTROL"))),
+        int(protocol.get("current_na", 100)),
+        params,
+    )
+    return _apply_protocol_timing_overrides(paramdict, protocol)
 
 
 def _lookup_kbath(external: Mapping[str, Any], t_ms: float) -> tuple[float, int, float, float]:
@@ -481,8 +525,8 @@ def simulate_voltage_trace(*args: Any, **kwargs: Any) -> np.ndarray:
     Step 04 order ``(condition, current_na, params, time_ms=...)``.
     """
     z0 = kwargs.pop("z0", None)
-    kwargs.pop("onset_ms", None)
-    kwargs.pop("offset_ms", None)
+    onset_ms = kwargs.pop("onset_ms", None)
+    offset_ms = kwargs.pop("offset_ms", None)
     if args and isinstance(args[0], str):
         condition = args[0]
         current_na = int(args[1])
@@ -497,7 +541,13 @@ def simulate_voltage_trace(*args: Any, **kwargs: Any) -> np.ndarray:
         raise ValueError("time_ms is required")
     sim = simulate_odeint(
         params,
-        {"experiment_type": condition, "current_na": int(current_na), "t_eval_ms": np.asarray(time_ms, dtype=float)},
+        {
+            "experiment_type": condition,
+            "current_na": int(current_na),
+            "t_eval_ms": np.asarray(time_ms, dtype=float),
+            "stim_onset_ms": onset_ms,
+            "stim_offset_ms": offset_ms,
+        },
         z0=z0,
         t_eval_ms=time_ms,
         return_hidden=False,

@@ -29,6 +29,8 @@ def test_single_control_cell_fit_writes_expected_outputs(project_root):
     inv = build_cell_trace_inventory(project_root / 'data' / '2_K+ Pumps Data', n_fit_points=10, file_ids=['1_DH_1_CONTROL'])
     assert list(inv) == ['1_DH_1_CONTROL']
     assert len(inv['1_DH_1_CONTROL']) == 6
+    assert inv['1_DH_1_CONTROL'][1].stim_onset_s == pytest.approx(11.166, abs=0.01)
+    assert inv['1_DH_1_CONTROL'][1].step_source == 'IP_curr'
     out = project_root / 'outputs' / 'step04_test_single'
     res = run_step04_cell_specific_six_sweep_fitting(project_root, output_dir=out, selected_file_ids=['1_DH_1_CONTROL'], max_cells=1, n_fit_points=10, n_starts=1, max_nfev_all6=1, max_nfev_holdout=1)
     assert (out / 'cell_fit_candidates.csv').exists()
@@ -60,6 +62,18 @@ def test_single_control_cell_fit_writes_expected_outputs(project_root):
     assert 'effective_selection_strategy' in res['effective_diverse_cell_ensembles'].columns
     assert set(res['cell_fit_candidates']['optimization_config_hash']) == {optimization_config['optimization_config_hash']}
     assert len(res['heldout_current_screen']) == 6
+
+
+def test_cell_trace_inventory_detects_per_file_control_timing(project_root):
+    inv = build_cell_trace_inventory(
+        project_root / 'data' / '2_K+ Pumps Data',
+        n_fit_points=10,
+        file_ids=['1_DH_1_CONTROL', '1_DH_2_CONTROL'],
+    )
+
+    assert inv['1_DH_1_CONTROL'][1].stim_onset_s == pytest.approx(11.166, abs=0.01)
+    assert inv['1_DH_2_CONTROL'][1].stim_onset_s == pytest.approx(21.153, abs=0.01)
+    assert inv['1_DH_2_CONTROL'][1].stim_offset_s == pytest.approx(41.129, abs=0.01)
 
 
 def test_step04_outputs_are_downstream_reusable(project_root):

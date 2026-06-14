@@ -1,0 +1,15 @@
+strategy,file_id,region,condition,stim_onset_s,stim_offset_s,step_source,n_candidates,n_accepted_candidates,accepted_under_rmse4_feature05,best_candidate_id,best_trace_rmse_mV,best_weighted_pass_fraction,best_meets_trace,best_meets_feature,best_meets_contract
+least_squares_12starts,1_DH_1_CONTROL,DH,CONTROL,11.166,31.116,IP_curr,12,12,12,1_DH_1_CONTROL__cand_03,2.657759295394304,0.6605061946925921,True,True,True
+nsga2_trace_feature_adaptive500,1_DH_1_CONTROL,DH,CONTROL,11.166,31.116,IP_curr,8,8,8,1_DH_1_CONTROL__cand_07,2.6500404692332338,0.6606475693412045,True,True,True
+least_squares_12starts,3_DH_1_CONTROL,DH,CONTROL,21.144,41.166,IP_volt,12,8,8,3_DH_1_CONTROL__cand_12,3.586704556945502,0.6769829255926313,True,True,True
+nsga2_trace_feature_adaptive500,3_DH_1_CONTROL,DH,CONTROL,21.144,41.166,IP_volt,8,6,6,3_DH_1_CONTROL__cand_07,3.2796206921362105,0.6762241439543047,True,True,True
+least_squares_12starts,2_VH_1_CONTROL,VH,CONTROL,21.117,41.075,IP_curr,12,0,0,2_VH_1_CONTROL__cand_05,2.7825332274888184,0.4338302889820047,True,False,False
+nsga2_trace_feature_adaptive500,2_VH_1_CONTROL,VH,CONTROL,21.117,41.075,IP_curr,12,0,0,2_VH_1_CONTROL__cand_05,2.78329487566875,0.4334436135953652,True,False,False
+least_squares_12starts,DH_1_MFA,DH,MFA,21.096,41.082,IP_curr,12,0,0,DH_1_MFA__cand_01,5.524010510686927,1.0,False,True,False
+nsga2_trace_feature_adaptive500,DH_1_MFA,DH,MFA,21.096,41.082,IP_curr,26,0,0,DH_1_MFA__cand_20,5.2060319742843655,1.0,False,True,False
+least_squares_12starts,VH_1_MFA,VH,MFA,21.105,41.078,IP_curr,12,12,12,VH_1_MFA__cand_08,2.3874002950286197,0.8386291390641561,True,True,True
+nsga2_trace_feature_adaptive500,VH_1_MFA,VH,MFA,21.105,41.078,IP_curr,19,19,19,VH_1_MFA__cand_17,2.301279856591968,0.857923278616028,True,True,True
+least_squares_12starts,DH_1_MFA_BA,DH,MFA_BA,21.106,41.102,IP_curr,12,0,0,DH_1_MFA_BA__cand_07,4.215514068123485,0.987699179582302,False,True,False
+nsga2_trace_feature_adaptive500,DH_1_MFA_BA,DH,MFA_BA,21.106,41.102,IP_curr,13,1,1,DH_1_MFA_BA__cand_13,3.9810107727747153,0.9997961349279416,True,True,True
+least_squares_12starts,VH_4_MFA_BA,VH,MFA_BA,21.075,41.076,IP_curr,12,9,9,VH_4_MFA_BA__cand_07,1.824929050724512,0.9726208874739432,True,True,True
+nsga2_trace_feature_adaptive500,VH_4_MFA_BA,VH,MFA_BA,21.075,41.076,IP_curr,11,11,11,VH_4_MFA_BA__cand_11,1.4771915829348918,0.9859185863670396,True,True,True

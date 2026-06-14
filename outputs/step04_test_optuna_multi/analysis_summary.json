@@ -17,7 +17,7 @@
   "step_name": "Step 04 cell-specific six-sweep fitting and accepted ensemble construction",
   "implementation_mode": "shared-cell least-squares fitting with multi-start and leave-one-sweep-out validation",
   "n_cells": 1,
-  "n_candidates": 1,
+  "n_candidates": 2,
   "n_accepted_candidates": 0,
   "n_effective_diverse_candidates": 0,
   "n_reviewer_facing_cells": 0,

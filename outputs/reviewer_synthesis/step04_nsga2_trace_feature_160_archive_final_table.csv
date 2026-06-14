@@ -1,0 +1,12 @@
+strategy,n_candidate_rows,n_accepted_rows,n_accepted_cells,cells_with_3plus_effective_clusters_t0_5,median_top5_min_pairwise_effective_log_distance,mean_best_trace_rmse_mV,mean_best_weighted_pass_fraction,accepted_cells_per_minute,elapsed_s
+random_acceptance_160_archive,1920,1105,10,10,4.361,4.023,0.572,4.776,125.628
+scipy_seed1_tpe160_pre60_post1,1944,1210,10,10,2.688,4.19,0.556,3.817,157.205
+nsga2_trace_feature_160_archive_adaptive_500,161,132,10,10,1.537,3.953,0.607,0.841,713.448
+nsga2_trace_feature_metric_multi_160_archive,68,51,10,9,2.085,4.084,0.578,9.696,61.879
+nsga2_multi_160_archive,113,76,10,9,2.139,4.035,0.586,9.508,63.104
+nsga2_multi_160_archive_refine_all_nfev15,226,144,10,9,2.138,4.032,0.586,3.223,186.171
+nsga2_multi_160_archive_refine_all_nfev30,226,144,10,9,2.138,4.032,0.586,2.737,219.219
+nsga2_trace_feature_160_archive,76,54,10,8,1.814,4.081,0.603,10.085,59.494
+nsga2_trace_feature_160_archive_feature_focused,76,54,10,8,1.814,4.081,0.603,9.574,62.67
+nsga2_trace_feature_160_archive_preseed_tpe160,79,57,10,8,1.675,4.081,0.603,8.329,72.038
+nsga2_trace_feature_160_archive_strict,161,0,0,0,,,,,729.594

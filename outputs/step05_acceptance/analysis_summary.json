@@ -28,5 +28,5 @@
   "cluster_evidence_status": "insufficient_evidence",
   "cluster_evidence_reason": "needs >= 6 candidates and >= 3 independent cells; observed 2 candidates and 1 cells",
   "headline_claim_scope": "insufficient_evidence_for_candidate_mechanism_regimes",
-  "elapsed_seconds": 2.039006575010717
+  "elapsed_seconds": 1.5371072470006766
 }

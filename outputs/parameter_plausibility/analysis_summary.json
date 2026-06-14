@@ -23,12 +23,12 @@
     "parameter_ranges_path": null,
     "write_outputs": true
   },
-  "n_candidates": 30,
-  "n_parameter_rows": 270,
-  "n_effective_rows": 120,
-  "n_out_of_range_rows": 50,
-  "n_phys_interpretable_rows": 79,
-  "n_constrained_rerun_rows": 180,
+  "n_candidates": 33,
+  "n_parameter_rows": 297,
+  "n_effective_rows": 132,
+  "n_out_of_range_rows": 28,
+  "n_phys_interpretable_rows": 97,
+  "n_constrained_rerun_rows": 198,
   "currents_na": [
     50,
     75,

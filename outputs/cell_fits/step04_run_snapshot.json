@@ -1,5 +1,5 @@
 {
-  "archive_path": "/home/xav/code/astromodel_proving/outputs/random_acceptance_160_archive_full_heldout_20260614_20260614_165722.zip",
+  "archive_path": "/home/xav/code/astromodel_proving/outputs/nsga2_trace_feature_adaptive500_rmse4_feature05_20260614_20260614_235936.zip",
   "astromodel_data_dir": null,
   "astromodel_project_root": "/home/xav/code/astromodel_proving",
   "downstream_artifacts": {
@@ -19,12 +19,13 @@
   "missing_artifacts": [],
   "output_dir": "/home/xav/code/astromodel_proving/outputs/cell_fits",
   "output_schema_version": "step04_cell_fits_v2",
-  "snapshot_created_at_local": "20260614_165722",
-  "snapshot_name": "random_acceptance_160_archive_full_heldout_20260614_20260614_165722",
+  "snapshot_created_at_local": "20260614_235936",
+  "snapshot_name": "nsga2_trace_feature_adaptive500_rmse4_feature05_20260614_20260614_235936",
   "step": "step04",
   "step04_env": {
-    "ASTROMODEL_STEP04_CELL_WORKERS": "10",
+    "ASTROMODEL_STEP04_CELL_WORKERS": "20",
+    "ASTROMODEL_STEP04_CLEAN_OUTPUT_DIR": "1",
     "ASTROMODEL_STEP04_FORCE_RERUN": "1",
-    "ASTROMODEL_STEP04_RUN_LABEL": "random_acceptance_160_archive_full_heldout_20260614"
+    "ASTROMODEL_STEP04_RUN_LABEL": "nsga2_trace_feature_adaptive500_rmse4_feature05_20260614"
   }
 }
