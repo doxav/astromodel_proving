@@ -2,6 +2,7 @@
   "step_name": "Step 05 \u2014 Mechanistic decomposition of accepted cell ensembles",
   "input_source": "outputs/cell_fits/accepted_cell_ensembles.csv",
   "config": {
+    "step04_source_path": null,
     "max_candidates": 2,
     "time_points": 60,
     "t_final_ms": 50000.0,
@@ -17,15 +18,15 @@
     "proxy_failure_downgrade_fraction": 0.5,
     "write_outputs": true
   },
-  "n_input_candidates": 1,
-  "n_candidate_sweep_rows": 6,
-  "n_windowed_mechanism_rows": 24,
-  "n_phenotype_tag_rows": 1,
-  "n_successful_sweep_simulations": 6,
+  "n_input_candidates": 2,
+  "n_candidate_sweep_rows": 12,
+  "n_windowed_mechanism_rows": 48,
+  "n_phenotype_tag_rows": 2,
+  "n_successful_sweep_simulations": 12,
   "n_mechanism_clusters": 1,
   "n_independent_cells": 1,
   "cluster_evidence_status": "insufficient_evidence",
-  "cluster_evidence_reason": "needs >= 6 candidates and >= 3 independent cells; observed 1 candidates and 1 cells",
+  "cluster_evidence_reason": "needs >= 6 candidates and >= 3 independent cells; observed 2 candidates and 1 cells",
   "headline_claim_scope": "insufficient_evidence_for_candidate_mechanism_regimes",
-  "elapsed_seconds": 0.7808946019995346
+  "elapsed_seconds": 2.039006575010717
 }

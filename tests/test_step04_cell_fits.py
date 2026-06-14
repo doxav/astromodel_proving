@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import pandas as pd
 
 import pytest
 
@@ -10,6 +11,9 @@ import numpy as np
 from src.step04_loss import Step04LossConfig, Step04OptimizerConfig
 from src.step04_cell_fits import (
     TRACE_SHAPE_OBJECTIVE_SPECS,
+    Step04Config,
+    _named_to_x,
+    _seed_optuna_study_from_candidate_csv,
     _trace_objective_loss,
     _transform_trace_for_objective,
     build_cell_trace_inventory,
@@ -269,3 +273,86 @@ def test_optuna_backend_raises_without_fallback_when_missing(project_root, monke
                 allow_optuna_fallback=False,
             ),
         )
+
+
+def test_optuna_preseed_csv_adds_only_accepted_candidates(tmp_path):
+    pytest.importorskip("optuna")
+    from optuna.distributions import FloatDistribution
+    import optuna
+
+    candidate_named = {
+        "P_gap_eff": 0.8,
+        "gamma_t_eff": 0.5,
+        "gamma_s_eff": 0.5,
+        "volume_ratio_wa_wo": 1.0,
+        "gki": 0.7,
+        "eps": 0.9,
+        "gl_a": 0.6,
+        "zth": 0.4,
+        "zs": 0.3,
+    }
+    candidate_vector = _named_to_x(candidate_named)
+    seed_csv = tmp_path / "seed_candidates.csv"
+    pd.DataFrame(
+        [
+            {
+                "file_id": "1_DH_1_CONTROL",
+                "accepted_all6": True,
+                "scalar_objective": 0.25,
+                "objective_trace": 0.15,
+                "objective_feature": 0.10,
+                **candidate_named,
+            },
+            {
+                "file_id": "1_DH_1_CONTROL",
+                "accepted_all6": False,
+                "scalar_objective": 0.10,
+                "objective_trace": 0.10,
+                "objective_feature": 0.05,
+                **candidate_named,
+            },
+            {
+                "file_id": "2_DH_1_CONTROL",
+                "accepted_all6": True,
+                "scalar_objective": 0.05,
+                "objective_trace": 0.02,
+                "objective_feature": 0.01,
+                **candidate_named,
+            },
+        ]
+    ).to_csv(seed_csv, index=False)
+
+    cfg = Step04Config(
+        project_root=tmp_path,
+        output_dir=tmp_path / "seeded_run",
+        optimizer_config=Step04OptimizerConfig(
+            optuna_preseed_candidate_csv=str(seed_csv),
+            optuna_preseed_candidate_limit=1,
+            optuna_preseed_only_accepted=True,
+        ),
+    ).resolve()
+
+    study = optuna.create_study(direction="minimize")
+    distributions = {
+        name: FloatDistribution(float(center - 1.0), float(center + 1.0))
+        for name, center in zip(
+            ["P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo", "gki", "eps", "gl_a", "zth", "zs"],
+            candidate_vector,
+        )
+    }
+
+    n_added = _seed_optuna_study_from_candidate_csv(
+        study=study,
+        file_id="1_DH_1_CONTROL",
+        cfg=cfg,
+        objective_names=(),
+        multi_objective=False,
+        distributions=distributions,
+        evaluate_x=None,
+    )
+
+    assert n_added == 1
+    complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    assert len(complete) == 1
+    assert complete[0].value is not None
+    assert complete[0].value == pytest.approx(0.25)

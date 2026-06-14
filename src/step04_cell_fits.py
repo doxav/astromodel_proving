@@ -74,6 +74,11 @@ BASE_CONDITION_DEFAULTS: dict[str, dict[str, Any]] = {
 
 EFFECTIVE_KEYS = ("P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo")
 OPTIMIZED_KEYS = ("P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo", "gki", "eps", "gl_a", "zth", "zs")
+EXTENDED_OPTIMIZED_KEYS = ("K_bath_value_middle", "eps_middle")
+K_BATH_MIDDLE_DEFAULT = 8.2
+K_BATH_MIDDLE_DELTA = 1.0
+EPS_MIDDLE_DEFAULT = 1.0
+EPS_MIDDLE_RELATIVE_DELTA = 0.10
 STEP02_HISTORICAL_FILE_ID_ALIASES: dict[str, str] = {
     "DH_old": "DH_1_CONTROL",
     "DH_old_CONTROL": "DH_1_CONTROL",
@@ -411,22 +416,49 @@ def _default_effective_by_condition(project_root: Path, condition: str) -> tuple
     return _effective_from_flat(flat), "generic_default"
 
 
-def _x_to_named(x: np.ndarray) -> dict[str, float]:
-    return {
-        "P_gap_eff": float(np.exp(x[0])),
-        "gamma_t_eff": float(np.exp(x[1])),
-        "gamma_s_eff": float(np.exp(x[2])),
-        "volume_ratio_wa_wo": float(np.exp(x[3])),
-        "gki": float(np.exp(x[4])),
-        "eps": float(np.exp(x[5])),
-        "gl_a": float(np.exp(x[6])),
-        "zth": float(x[7]),
-        "zs": float(np.exp(x[8])),
-    }
+def _optimized_keys_for_config(cfg: "Step04Config | None" = None) -> tuple[str, ...]:
+    if cfg is None:
+        return OPTIMIZED_KEYS
+    if bool(getattr(cfg.optimizer_config, "optuna_include_extended_parameters", False)) and (
+        bool(getattr(cfg.optimizer_config, "optuna_extend_parameter_space_when_large", False))
+        and int(getattr(cfg.optimizer_config, "optuna_adaptive_max_trials", 0)) > 100
+    ):
+        return (*OPTIMIZED_KEYS, *EXTENDED_OPTIMIZED_KEYS)
+    return OPTIMIZED_KEYS
 
 
-def _named_to_x(named: Mapping[str, float]) -> np.ndarray:
-    return np.asarray([
+def _x_to_named(x: np.ndarray, keys: Sequence[str] | None = None) -> dict[str, float]:
+    names = tuple(keys) if keys is not None else OPTIMIZED_KEYS
+    if len(x) < len(names):
+        raise ValueError("parameter vector shorter than expected")
+    values: dict[str, float] = {}
+    base_map = [
+        ("P_gap_eff", 0, False),
+        ("gamma_t_eff", 1, False),
+        ("gamma_s_eff", 2, False),
+        ("volume_ratio_wa_wo", 3, False),
+        ("gki", 4, False),
+        ("eps", 5, False),
+        ("gl_a", 6, False),
+        ("zth", 7, True),
+        ("zs", 8, False),
+        ("K_bath_value_middle", 9, False),
+        ("eps_middle", 10, False),
+    ]
+    for name, index, linear in base_map:
+        if name not in names:
+            continue
+        raw = float(x[int(index)])
+        values[name] = float(raw if linear else np.exp(raw))
+    return {name: float(values[name]) for name in names if name in values}
+
+
+def _named_to_x(named: Mapping[str, float], keys: Sequence[str] | None = None) -> np.ndarray:
+    names = tuple(keys) if keys is not None else OPTIMIZED_KEYS
+    for name in names:
+        if name not in named:
+            raise ValueError(f"missing parameter {name!r} when building optimizer coordinates")
+    values = [
         np.log(max(float(named["P_gap_eff"]), 1e-12)),
         np.log(max(float(named["gamma_t_eff"]), 1e-12)),
         np.log(max(float(named["gamma_s_eff"]), 1e-12)),
@@ -436,21 +468,48 @@ def _named_to_x(named: Mapping[str, float]) -> np.ndarray:
         np.log(max(float(named["gl_a"]), 1e-12)),
         float(named["zth"]),
         np.log(max(float(named["zs"]), 1e-12)),
-    ], dtype=float)
+    ]
+    if "K_bath_value_middle" in names:
+        values.append(np.log(max(float(named["K_bath_value_middle"]), 1e-12)))
+    if "eps_middle" in names:
+        values.append(np.log(max(float(named["eps_middle"]), 1e-12)))
+    if len(values) != len(names):
+        raise ValueError(
+            f"unexpected parameter mapping length: {len(values)} values for {len(names)} requested names"
+        )
+    return np.asarray(values, dtype=float)
 
 
-def _x_bounds() -> tuple[np.ndarray, np.ndarray]:
+def _x_bounds(cfg: "Step04Config | None" = None) -> tuple[np.ndarray, np.ndarray]:
     lower = np.asarray([
         np.log(1e-8), np.log(1e-8), np.log(1e-8), np.log(0.05), np.log(0.5), np.log(1e-5), np.log(1e-5), 0.0, np.log(1e-3)
     ], dtype=float)
     upper = np.asarray([
         np.log(1e-2), np.log(1e-2), np.log(1e-1), np.log(10.0), np.log(500.0), np.log(0.1), np.log(20.0), 150.0, np.log(50.0)
     ], dtype=float)
+    names = _optimized_keys_for_config(cfg)
+    if names == OPTIMIZED_KEYS:
+        return lower, upper
+    extra_lower = []
+    extra_upper = []
+    if "K_bath_value_middle" in names:
+        center = K_BATH_MIDDLE_DEFAULT
+        extra_lower.append(np.log(max(center - K_BATH_MIDDLE_DELTA, 1e-12)))
+        extra_upper.append(np.log(center + K_BATH_MIDDLE_DELTA))
+    if "eps_middle" in names:
+        center = EPS_MIDDLE_DEFAULT
+        half_width = abs(center) * EPS_MIDDLE_RELATIVE_DELTA
+        extra_lower.append(np.log(max(center - half_width, 1e-12)))
+        extra_upper.append(np.log(center + half_width))
+    if extra_lower:
+        lower = np.concatenate((lower, np.asarray(extra_lower, dtype=float)))
+        upper = np.concatenate((upper, np.asarray(extra_upper, dtype=float)))
     return lower, upper
 
 
-def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tuple[np.ndarray, str, str]]:
+def _start_vectors(project_root: Path, condition: str, n_starts: int, cfg: "Step04Config | None" = None) -> list[tuple[np.ndarray, str, str]]:
     eff0, seed_source = _default_effective_by_condition(project_root, condition)
+    optimized_keys = _optimized_keys_for_config(cfg)
     base_named = {
         **eff0,
         "gki": 45.0 if condition == "CONTROL" else 30.0,
@@ -458,6 +517,8 @@ def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tu
         "gl_a": 0.01,
         "zth": 0.2,
         "zs": 0.05,
+        "K_bath_value_middle": K_BATH_MIDDLE_DEFAULT,
+        "eps_middle": EPS_MIDDLE_DEFAULT,
     }
     starts = []
     scales = [
@@ -474,12 +535,16 @@ def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tu
                 named[k] = float(named[k]) * float(f)
             else:
                 named[k] = max(float(named[k]) * float(f), 1e-10)
-        starts.append((_named_to_x(named), seed_source, f"start_{idx:02d}"))
+        starts.append((_named_to_x(named, keys=optimized_keys), seed_source, f"start_{idx:02d}"))
     if len(starts) < requested_starts:
         rng = np.random.default_rng(1701)
-        lower, upper = _x_bounds()
-        base_x = _named_to_x(base_named)
+        lower, upper = _x_bounds(cfg)
+        base_x = _named_to_x(base_named, keys=optimized_keys)
         jitter_width = np.asarray([1.4, 1.4, 1.4, 0.7, 0.7, 1.0, 1.0, 15.0, 1.0], dtype=float)
+        if "K_bath_value_middle" in optimized_keys:
+            jitter_width = np.append(jitter_width, 0.2)
+        if "eps_middle" in optimized_keys:
+            jitter_width = np.append(jitter_width, 0.02)
         while len(starts) < requested_starts:
             idx = len(starts) + 1
             jittered = np.clip(base_x + rng.uniform(-jitter_width, jitter_width), lower, upper)
@@ -487,8 +552,8 @@ def _start_vectors(project_root: Path, condition: str, n_starts: int) -> list[tu
     return starts
 
 
-def _params_from_x(condition: str, x: np.ndarray, seed_source: str, start_label: str) -> dict[str, Any]:
-    named = _x_to_named(x)
+def _params_from_x(condition: str, x: np.ndarray, seed_source: str, start_label: str, cfg: "Step04Config | None" = None) -> dict[str, Any]:
+    named = _x_to_named(x, keys=_optimized_keys_for_config(cfg))
     eff = {k: named[k] for k in EFFECTIVE_KEYS}
     flat = _flat_from_effective(condition, eff, extra={
         "gki": named["gki"],
@@ -496,6 +561,8 @@ def _params_from_x(condition: str, x: np.ndarray, seed_source: str, start_label:
         "gl_a": named["gl_a"],
         "zth": named["zth"],
         "zs": named["zs"],
+        "K_bath_value_middle": named.get("K_bath_value_middle", K_BATH_MIDDLE_DEFAULT),
+        "eps_middle": named.get("eps_middle", EPS_MIDDLE_DEFAULT),
         "seed_source": seed_source,
         "start_label": start_label,
     })
@@ -519,7 +586,7 @@ def _simulate_sweep(params: Mapping[str, Any], sweep_trace: SweepTrace) -> tuple
 
 
 def _residual_vector(x: np.ndarray, condition: str, sweeps_to_fit: Sequence[int], trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> np.ndarray:
-    params = _params_from_x(condition, x, seed_source="runtime", start_label="runtime")
+    params = _params_from_x(condition, x, seed_source="runtime", start_label="runtime", cfg=cfg)
     residuals: list[np.ndarray] = []
     penalty = 0.0
     feature_columns = feature_columns_for_loss(cfg.loss_config.feature_set)
@@ -626,7 +693,7 @@ def _balanced_objective_components_from_x(
 ) -> dict[str, float]:
     """Compute a fast, scaled Optuna objective without building full score tables."""
 
-    params = _params_from_x(condition, x, seed_source="optuna_objective", start_label="trial")
+    params = _params_from_x(condition, x, seed_source="optuna_objective", start_label="trial", cfg=cfg)
     feature_columns = feature_columns_for_loss(cfg.loss_config.feature_set)
     trace_losses: list[float] = []
     feature_losses: list[float] = []
@@ -713,7 +780,7 @@ def _trace_shape_objective_components_from_x(
 ) -> dict[str, float]:
     """Compute the fastest Optuna objective: clipped baseline-subtracted trace shape only."""
 
-    params = _params_from_x(condition, x, seed_source="optuna_trace_shape", start_label="trial")
+    params = _params_from_x(condition, x, seed_source="optuna_trace_shape", start_label="trial", cfg=cfg)
     trace_losses: list[float] = []
     n_failures = 0
     trace_scale = max(float(cfg.trace_scale_mV), 1e-9)
@@ -767,7 +834,13 @@ def _acceptance_margin_objective_components_from_x(
 ) -> dict[str, float]:
     """Optimize directly against Step04 trace and feature acceptance margins."""
 
-    params = _params_from_x(condition, x, seed_source="optuna_acceptance_margin", start_label="trial")
+    params = _params_from_x(
+        condition,
+        x,
+        seed_source="optuna_acceptance_margin",
+        start_label="trial",
+        cfg=cfg,
+    )
     _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
     trace_rmse = float(agg.get("mean_trace_rmse_mV", np.inf))
     trace_ratio = trace_rmse / max(float(cfg.trace_rmse_accept), 1e-9) if np.isfinite(trace_rmse) else 100.0
@@ -795,7 +868,7 @@ def _optuna_objective_components_from_x(
     """Evaluate the configured Optuna objective components for one transformed parameter vector."""
 
     if cfg.optimizer_config.optuna_objective == "metric_scalar":
-        params = _params_from_x(condition, x, seed_source="optuna", start_label="trial")
+        params = _params_from_x(condition, x, seed_source="optuna", start_label="trial", cfg=cfg)
         _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
         return _objective_components_from_agg(agg, prior_penalty=_weak_prior_penalty_from_x(x, prior_reference_x))
     if cfg.optimizer_config.optuna_objective in TRACE_SHAPE_OBJECTIVE_SPECS:
@@ -864,6 +937,8 @@ def _objective_components_from_agg(agg: Mapping[str, Any], prior_penalty: float 
         "prior": float(prior_penalty),
         "hidden": float(hidden_penalty),
         "fail": failures,
+        "mean_trace_rmse_mV": float(agg.get("mean_trace_rmse_mV", np.inf)),
+        "mean_weighted_pass_fraction": float(agg.get("mean_weighted_pass_fraction", 0.0)),
     }
 
 
@@ -878,14 +953,188 @@ def _candidate_acceptance_flags(row: Mapping[str, Any], cfg: Step04Config) -> di
     }
 
 
-def _suggest_named_from_trial(trial: Any, lower: np.ndarray, upper: np.ndarray) -> np.ndarray:
-    return np.asarray([trial.suggest_float(name, float(lo), float(hi)) for name, lo, hi in zip(OPTIMIZED_KEYS, lower, upper)], dtype=float)
+def _is_component_accepted_by_contract(components: Mapping[str, Any], cfg: Step04Config) -> bool | None:
+    trace = components.get("mean_trace_rmse_mV")
+    pass_fraction = components.get("mean_weighted_pass_fraction")
+    n_failures = components.get("n_failures")
+    if trace is None or pass_fraction is None or n_failures is None:
+        return None
+    try:
+        trace_value = float(trace)
+        pass_value = float(pass_fraction)
+        fail_value = float(n_failures)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(trace_value) or not np.isfinite(pass_value) or not np.isfinite(fail_value):
+        return None
+    return bool(trace_value <= cfg.trace_rmse_accept and pass_value >= cfg.feature_pass_accept and fail_value == 0.0)
 
 
-def _trial_params_from_x(x: np.ndarray) -> dict[str, float]:
+def _suggest_named_from_trial(
+    trial: Any,
+    lower: np.ndarray,
+    upper: np.ndarray,
+    *,
+    optimized_keys: Sequence[str],
+) -> np.ndarray:
+    return np.asarray(
+        [trial.suggest_float(name, float(lo), float(hi)) for name, lo, hi in zip(optimized_keys, lower, upper)],
+        dtype=float,
+    )
+
+
+def _trial_params_from_x(x: np.ndarray, *, optimized_keys: Sequence[str]) -> dict[str, float]:
     """Return Optuna trial parameters in the internal transformed coordinate space."""
 
-    return {name: float(value) for name, value in zip(OPTIMIZED_KEYS, np.asarray(x, dtype=float))}
+    values = np.asarray(x, dtype=float)
+    return {name: float(value) for name, value in zip(optimized_keys, values)}
+
+
+def _optuna_candidate_x_from_row(row: Mapping[str, Any], cfg: Step04Config | None = None) -> np.ndarray:
+    optimized_keys = _optimized_keys_for_config(cfg)
+    named = {
+        "P_gap_eff": row.get("P_gap_eff"),
+        "gamma_t_eff": row.get("gamma_t_eff"),
+        "gamma_s_eff": row.get("gamma_s_eff"),
+        "volume_ratio_wa_wo": row.get("volume_ratio_wa_wo"),
+        "gki": row.get("gki"),
+        "eps": row.get("eps"),
+        "gl_a": row.get("gl_a"),
+        "zth": row.get("zth"),
+        "zs": row.get("zs"),
+        "K_bath_value_middle": row.get("K_bath_value_middle", K_BATH_MIDDLE_DEFAULT),
+        "eps_middle": row.get("eps_middle", EPS_MIDDLE_DEFAULT),
+    }
+    x = _named_to_x(
+        named={
+            key: float(np.asarray([named[key]], dtype=float)[0])
+            for key in optimized_keys
+            if named.get(key) is not None
+        },
+        keys=optimized_keys,
+    )
+    if not np.isfinite(x).all():
+        raise ValueError("seed row contains non-finite candidate coordinates")
+    return x
+
+
+def _optuna_objective_values_from_row(
+    row: Mapping[str, Any],
+    objective_names: Sequence[str],
+) -> tuple[float, ...] | None:
+    values: list[float] = []
+    for name in objective_names:
+        key = f"objective_{name}"
+        if key not in row:
+            return None
+        value = float(np.asarray([row[key]], dtype=float)[0])
+        if not np.isfinite(value):
+            return None
+        values.append(value)
+    return tuple(values)
+
+
+def _optuna_scalar_objective_from_row(row: Mapping[str, Any]) -> float | None:
+    if "scalar_objective" not in row and "objective_scalar" not in row:
+        return None
+    key = "scalar_objective" if "scalar_objective" in row else "objective_scalar"
+    value = float(np.asarray([row[key]], dtype=float)[0])
+    return value if np.isfinite(value) else None
+
+
+def _seed_optuna_study_from_candidate_csv(
+    study: Any,
+    file_id: str,
+    cfg: Step04Config,
+    objective_names: Sequence[str],
+    multi_objective: bool,
+    distributions: Mapping[str, Any],
+    evaluate_x: Any | None = None,
+) -> int:
+    source_csv = cfg.optimizer_config.optuna_preseed_candidate_csv
+    if not source_csv:
+        return 0
+    path = Path(source_csv)
+    if not path.exists():
+        raise FileNotFoundError(f"Optuna preseed CSV does not exist: {path}")
+    source = pd.read_csv(path)
+    if source.empty:
+        return 0
+    if "file_id" in source.columns:
+        source = source[source["file_id"].astype(str) == str(file_id)]
+    if source.empty:
+        return 0
+    if cfg.optimizer_config.optuna_preseed_only_accepted and "accepted_all6" in source.columns:
+        source = source[source["accepted_all6"].astype(str).str.lower().isin({"true", "1", "yes"})]
+    if source.empty:
+        return 0
+    if multi_objective:
+        if all(col in source.columns for col in [f"objective_{name}" for name in objective_names]):
+            source = source.assign(_seed_sort_key=source[[f"objective_{name}" for name in objective_names]].sum(axis=1))
+            source = source.sort_values("_seed_sort_key", ascending=True)
+            source = source.drop(columns=["_seed_sort_key"])
+        else:
+            source = source.sort_values("scalar_objective", ascending=True, kind="mergesort")
+    else:
+        source = source.sort_values("scalar_objective", ascending=True, kind="mergesort")
+    limit = int(cfg.optimizer_config.optuna_preseed_candidate_limit)
+    if limit > 0:
+        source = source.head(limit)
+    from optuna.trial import create_trial
+
+    seen: set[tuple[float, ...]] = set()
+    seeded = 0
+    for row in source.to_dict("records"):
+        try:
+            x = _optuna_candidate_x_from_row(row, cfg=cfg)
+        except (TypeError, ValueError, KeyError):
+            continue
+        optimized_keys = _optimized_keys_for_config(cfg)
+        params = _trial_params_from_x(x, optimized_keys=optimized_keys)
+        key = tuple(float(params[name]) for name in optimized_keys)
+        if key in seen:
+            continue
+        if multi_objective:
+            objective_values = _optuna_objective_values_from_row(row, objective_names)
+            if objective_values is None:
+                if evaluate_x is None:
+                    continue
+                components = evaluate_x(x)
+                objective_values = tuple(float(components[name]) for name in objective_names)
+            if not all(np.isfinite(value) for value in objective_values):
+                continue
+            trial = create_trial(params=params, distributions=distributions, values=objective_values)
+        else:
+            scalar = _optuna_scalar_objective_from_row(row)
+            if scalar is None:
+                if evaluate_x is None:
+                    continue
+                components = evaluate_x(x)
+                scalar = float(scalarize_components(components, cfg.loss_config))
+            if not np.isfinite(scalar):
+                continue
+            trial = create_trial(params=params, distributions=distributions, value=float(scalar))
+        study.add_trial(trial)
+        seen.add(key)
+        seeded += 1
+    return seeded
+
+
+def _resolve_optuna_trial_data(
+    trial: Any,
+    evaluate_x: Any,
+    trial_cache: dict[int, tuple[np.ndarray, dict[str, float]]],
+    optimized_keys: Sequence[str],
+) -> tuple[np.ndarray, dict[str, float]]:
+    if trial.number in trial_cache:
+        return trial_cache[trial.number]
+    params = getattr(trial, "params", {})
+    x = np.asarray([float(params.get(name, np.nan)) for name in optimized_keys], dtype=float)
+    if not np.isfinite(x).all():
+        raise RuntimeError(f"Invalid Optuna parameters for trial {int(trial.number)}")
+    components = evaluate_x(x)
+    trial_cache[trial.number] = (x, components)
+    return trial_cache[trial.number]
 
 
 def _optuna_sampler(optimizer_config: Step04OptimizerConfig) -> Any:
@@ -946,6 +1195,8 @@ def _candidate_row_from_solution(
         "gl_a": float(params["gl_a"]),
         "zth": float(params["zth"]),
         "zs": float(params["zs"]),
+        "K_bath_value_middle": float(params.get("K_bath_value_middle", K_BATH_MIDDLE_DEFAULT)),
+        "eps_middle": float(params.get("eps_middle", EPS_MIDDLE_DEFAULT)),
         **eff,
         **agg,
         "objective_trace": components["trace"],
@@ -1020,10 +1271,13 @@ def _write_step04_sqlite(output_dir: Path, tables: Mapping[str, pd.DataFrame], m
 
 def _fit_cell_all6_least_squares(project_root: Path, file_id: str, trace_inventory: Mapping[int, SweepTrace], empirical_rows: Mapping[int, Mapping[str, Any]], thresholds_df: pd.DataFrame, cfg: Step04Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     condition = next(iter(trace_inventory.values())).condition
-    lower, upper = _x_bounds()
+    lower, upper = _x_bounds(cfg)
     candidate_rows: list[dict[str, Any]] = []
     sweep_rows: list[pd.DataFrame] = []
-    for start_idx, (x0, seed_source, start_label) in enumerate(_start_vectors(project_root, condition, cfg.n_starts), start=1):
+    for start_idx, (x0, seed_source, start_label) in enumerate(
+        _start_vectors(project_root, condition, cfg.n_starts, cfg=cfg),
+        start=1,
+    ):
         result = least_squares(
             _residual_vector,
             x0=x0,
@@ -1086,8 +1340,8 @@ def _fit_cell_all6_optuna_fallback(project_root: Path, file_id: str, trace_inven
     """Small deterministic fallback for environments that have not installed Optuna yet."""
 
     condition = next(iter(trace_inventory.values())).condition
-    lower, upper = _x_bounds()
-    prior_x = _start_vectors(project_root, condition, max(1, cfg.n_starts))[0][0]
+    lower, upper = _x_bounds(cfg)
+    prior_x = _start_vectors(project_root, condition, max(1, cfg.n_starts), cfg=cfg)[0][0]
     rng = np.random.default_rng(42)
     evaluated: list[tuple[_FallbackTrial, np.ndarray, dict[str, float], float]] = []
     for number in range(max(1, int(cfg.optimizer_config.optuna_n_trials))):
@@ -1146,9 +1400,10 @@ def _fit_cell_all6_hybrid(project_root: Path, file_id: str, trace_inventory: Map
         ) from exc
 
     condition = next(iter(trace_inventory.values())).condition
-    lower, upper = _x_bounds()
-    starts = _start_vectors(project_root, condition, max(1, cfg.n_starts))
+    lower, upper = _x_bounds(cfg)
+    starts = _start_vectors(project_root, condition, max(1, cfg.n_starts), cfg=cfg)
     prior_x = starts[0][0]
+    optimized_keys = _optimized_keys_for_config(cfg)
     all_sweeps = list(sorted(trace_inventory))
     pre_nfev = min(int(cfg.optimizer_config.hybrid_scipy_pre_nfev), int(cfg.max_nfev_all6))
     post_nfev = min(int(cfg.optimizer_config.hybrid_scipy_post_nfev), int(cfg.max_nfev_all6))
@@ -1207,7 +1462,12 @@ def _fit_cell_all6_hybrid(project_root: Path, file_id: str, trace_inventory: Map
         )
 
     def objective(trial: Any) -> float:
-        x = _suggest_named_from_trial(trial, lower, upper)
+        x = _suggest_named_from_trial(
+            trial,
+            lower,
+            upper,
+            optimized_keys=optimized_keys,
+        )
         components = evaluate_x(x)
         trial_cache[trial.number] = (x, components)
         return scalarize_components(components, cfg.loss_config)
@@ -1220,14 +1480,33 @@ def _fit_cell_all6_hybrid(project_root: Path, file_id: str, trace_inventory: Map
         study_name=cfg.optimizer_config.optuna_study_name,
         load_if_exists=bool(cfg.optimizer_config.optuna_storage and cfg.optimizer_config.optuna_study_name),
     )
+    distributions = {
+        name: optuna.distributions.FloatDistribution(float(lo), float(hi))
+        for name, lo, hi in zip(optimized_keys, lower, upper)
+    }
+    _seed_optuna_study_from_candidate_csv(
+        study=study,
+        file_id=file_id,
+        cfg=cfg,
+        objective_names=tuple(cfg.loss_config.multi_objective_names),
+        multi_objective=False,
+        distributions=distributions,
+        evaluate_x=evaluate_x,
+    )
     for x in seeded_xs:
-        study.enqueue_trial(_trial_params_from_x(x))
+        study.enqueue_trial(_trial_params_from_x(x, optimized_keys=optimized_keys))
     study.optimize(objective, n_trials=cfg.optimizer_config.optuna_n_trials, timeout=cfg.optimizer_config.optuna_timeout_s)
 
-    complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE and t.number in trial_cache]
+    complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     ranked_trials = sorted(complete, key=lambda t: float(t.value if t.value is not None else np.inf))
     for idx, trial in enumerate(ranked_trials[:candidate_top_k], start=1):
-        x = trial_cache[trial.number][0]
+        x, components = _resolve_optuna_trial_data(
+            trial,
+            evaluate_x,
+            trial_cache,
+            optimized_keys=optimized_keys,
+        )
+        trial_cost = scalarize_components(components, cfg.loss_config)
         row, sweep_df = _candidate_row_from_solution(
             file_id=file_id,
             condition=condition,
@@ -1241,7 +1520,7 @@ def _fit_cell_all6_hybrid(project_root: Path, file_id: str, trace_inventory: Map
             start_label=f"trial_{trial.number}",
             optimizer_status=1,
             optimizer_success=True,
-            optimizer_cost=float(scalarize_components(trial_cache[trial.number][1], cfg.loss_config)),
+            optimizer_cost=float(trial_cost),
             optimizer_nfev=1,
             prior_reference_x=prior_x,
             optuna_trial=trial,
@@ -1299,10 +1578,12 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
         return _fit_cell_all6_optuna_fallback(project_root, file_id, trace_inventory, empirical_rows, thresholds_df, cfg)
 
     condition = next(iter(trace_inventory.values())).condition
-    lower, upper = _x_bounds()
-    starts = _start_vectors(project_root, condition, max(1, cfg.n_starts))
+    lower, upper = _x_bounds(cfg)
+    starts = _start_vectors(project_root, condition, max(1, cfg.n_starts), cfg=cfg)
     prior_x = starts[0][0]
+    optimized_keys = _optimized_keys_for_config(cfg)
     trial_cache: dict[int, tuple[np.ndarray, dict[str, float]]] = {}
+    timeout_s = cfg.optimizer_config.optuna_timeout_s
 
     def evaluate_x(x: np.ndarray) -> dict[str, float]:
         return _optuna_objective_components_from_x(
@@ -1316,8 +1597,40 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
             prior_reference_x=prior_x,
         )
 
+    def resolve_trial_components(trial: Any) -> tuple[np.ndarray, dict[str, float]]:
+        return _resolve_optuna_trial_data(trial, evaluate_x, trial_cache, optimized_keys=optimized_keys)
+
+    def resolve_with_contract_metrics(trial: Any) -> tuple[np.ndarray, dict[str, float]]:
+        x, components = resolve_trial_components(trial)
+        accepted = _is_component_accepted_by_contract(components, cfg)
+        if accepted is not None:
+            return x, components
+        params = _params_from_x(condition, x, seed_source="optuna", start_label=f"trial_{trial.number}", cfg=cfg)
+        _, agg = _score_candidate_metrics(params, trace_inventory, empirical_rows, thresholds_df, cfg.loss_config)
+        full_components = _objective_components_from_agg(
+            agg,
+            prior_penalty=_weak_prior_penalty_from_x(x, prior_x),
+        )
+        trial_cache[int(trial.number)] = (x, full_components)
+        return x, full_components
+
+    def count_accepted_trials() -> tuple[int, int]:
+        complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        accepted = 0
+        for trial in complete:
+            _, components = resolve_with_contract_metrics(trial)
+            is_accepted = _is_component_accepted_by_contract(components, cfg)
+            if is_accepted:
+                accepted += 1
+        return accepted, len(complete)
+
     def objective(trial: Any) -> float | tuple[float, ...]:
-        x = _suggest_named_from_trial(trial, lower, upper)
+        x = _suggest_named_from_trial(
+            trial,
+            lower,
+            upper,
+            optimized_keys=optimized_keys,
+        )
         components = evaluate_x(x)
         trial_cache[trial.number] = (x, components)
         if cfg.optimizer_config.backend == "optuna_multi":
@@ -1335,10 +1648,55 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
         study = optuna.create_study(directions=["minimize"] * len(cfg.loss_config.multi_objective_names), **common)
     else:
         study = optuna.create_study(direction="minimize", **common)
-    study.optimize(objective, n_trials=cfg.optimizer_config.optuna_n_trials, timeout=cfg.optimizer_config.optuna_timeout_s)
+    distributions = {
+        name: optuna.distributions.FloatDistribution(float(lo), float(hi))
+        for name, lo, hi in zip(optimized_keys, lower, upper)
+    }
+    _seed_optuna_study_from_candidate_csv(
+        study=study,
+        file_id=file_id,
+        cfg=cfg,
+        objective_names=tuple(cfg.loss_config.multi_objective_names),
+        multi_objective=(cfg.optimizer_config.backend == "optuna_multi"),
+        distributions=distributions,
+        evaluate_x=evaluate_x,
+    )
+    min_accepted = int(cfg.optimizer_config.optuna_adaptive_min_accepted_per_cell)
+    trial_step = int(cfg.optimizer_config.optuna_adaptive_trial_step)
+    max_trials = int(cfg.optimizer_config.optuna_adaptive_max_trials)
+    target_n_trials = int(cfg.optimizer_config.optuna_n_trials)
+    if target_n_trials < 1:
+        target_n_trials = 1
+    if max_trials > 0 and max_trials < target_n_trials:
+        target_n_trials = max_trials
+    if max_trials <= target_n_trials:
+        study.optimize(objective, n_trials=target_n_trials, timeout=timeout_s)
+    else:
+        remaining = max_trials
+        while len(study.trials) < max_trials:
+            completed_trials = len(study.trials)
+            n_pending = min(
+                trial_step if trial_step > 0 else (max_trials - completed_trials),
+                max_trials - completed_trials,
+            )
+            n_pending = max(1, int(n_pending))
+            study.optimize(objective, n_trials=n_pending, timeout=timeout_s)
+            accepted_count, _n_complete = count_accepted_trials()
+            if accepted_count >= min_accepted > 0:
+                break
+            remaining -= n_pending
+            if n_pending <= 0 or remaining <= 0:
+                break
 
     if cfg.optimizer_config.backend == "optuna_multi":
-        source_trials = sorted(study.best_trials, key=lambda t: scalarize_components(trial_cache[t.number][1], cfg.loss_config))[: max(1, int(cfg.optimizer_config.candidate_top_k))]
+        candidate_candidates: list[tuple[float, Any]] = []
+        for trial in study.best_trials:
+            _, components = _resolve_optuna_trial_data(trial, evaluate_x, trial_cache, optimized_keys=optimized_keys)
+            candidate_candidates.append((scalarize_components(components, cfg.loss_config), trial))
+        source_trials = [trial for _, trial in sorted(candidate_candidates, key=lambda item: float(item[0]))][: max(
+            1,
+            int(cfg.optimizer_config.candidate_top_k),
+        )]
         pareto_numbers = {t.number for t in study.best_trials}
     else:
         complete = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
@@ -1348,7 +1706,7 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
     candidate_rows: list[dict[str, Any]] = []
     sweep_rows: list[pd.DataFrame] = []
     for idx, trial in enumerate(source_trials, start=1):
-        x = trial_cache[trial.number][0]
+        x, components = _resolve_optuna_trial_data(trial, evaluate_x, trial_cache, optimized_keys=optimized_keys)
         row, sweep_df = _candidate_row_from_solution(
             file_id=file_id,
             condition=condition,
@@ -1362,7 +1720,7 @@ def _fit_cell_all6_optuna(project_root: Path, file_id: str, trace_inventory: Map
             start_label=f"trial_{trial.number}",
             optimizer_status=1,
             optimizer_success=True,
-            optimizer_cost=float(scalarize_components(trial_cache[trial.number][1], cfg.loss_config)),
+            optimizer_cost=float(scalarize_components(components, cfg.loss_config)),
             optimizer_nfev=1,
             prior_reference_x=prior_x,
             optuna_trial=trial,
@@ -1397,8 +1755,12 @@ def _fit_holdout(file_id: str, trace_inventory: Mapping[int, SweepTrace], empiri
         "zth": float(best_candidate["zth"]),
         "zs": float(best_candidate["zs"]),
     }
-    x_start = _named_to_x(named)
-    lower, upper = _x_bounds()
+    if "K_bath_value_middle" in best_candidate:
+        named["K_bath_value_middle"] = float(best_candidate["K_bath_value_middle"])
+    if "eps_middle" in best_candidate:
+        named["eps_middle"] = float(best_candidate["eps_middle"])
+    x_start = _named_to_x(named, keys=_optimized_keys_for_config(cfg))
+    lower, upper = _x_bounds(cfg)
     rows: list[dict[str, Any]] = []
     for train_sweeps, heldout in heldout_splits(6):
         res = least_squares(
@@ -1439,6 +1801,10 @@ def reconstruct_candidate_params(candidate_row: Mapping[str, Any]) -> dict[str, 
     condition = str(candidate_row["condition"])
     eff = {k: float(candidate_row[k]) for k in EFFECTIVE_KEYS}
     extra = {k: float(candidate_row[k]) for k in ["gki", "eps", "gl_a", "zth", "zs"]}
+    if "K_bath_value_middle" in candidate_row:
+        extra["K_bath_value_middle"] = float(candidate_row["K_bath_value_middle"])
+    if "eps_middle" in candidate_row:
+        extra["eps_middle"] = float(candidate_row["eps_middle"])
     return _flat_from_effective(condition, eff, extra=extra)
 
 

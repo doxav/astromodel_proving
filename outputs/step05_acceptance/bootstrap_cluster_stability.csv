@@ -1,2 +1,2 @@
 bootstrap_iteration,n_cells,n_candidates,coassignment_stability,stability_status,stability_reason
-0,1,1,,insufficient_evidence,needs >= 6 candidates and >= 3 independent cells; observed 1 candidates and 1 cells
+0,1,2,,insufficient_evidence,needs >= 6 candidates and >= 3 independent cells; observed 2 candidates and 1 cells

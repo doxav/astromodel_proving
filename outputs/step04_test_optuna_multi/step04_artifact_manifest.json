@@ -4,6 +4,8 @@
     "accepted_ensembles": "accepted_cell_ensembles.csv",
     "analysis_summary": "analysis_summary.json",
     "candidates": "cell_fit_candidates.csv",
+    "effective_diverse_ensembles": "effective_diverse_cell_ensembles.csv",
+    "effective_diverse_selection_summary": "effective_diverse_selection_summary.csv",
     "heldout_screen": "heldout_current_screen.csv",
     "optimization_config": "optimization_config.json",
     "quality_summary": "cell_fit_quality_summary.csv",
@@ -12,7 +14,7 @@
     "trace_inventory": "cell_trace_inventory.csv"
   },
   "missing_artifacts": [],
-  "optimization_config_hash": "74346534fdbd4b05",
+  "optimization_config_hash": "43abdc8245786113",
   "output_dir": "/home/xav/code/astromodel_proving/outputs/step04_test_optuna_multi",
   "output_schema_version": "step04_cell_fits_v2",
   "step": "step04"

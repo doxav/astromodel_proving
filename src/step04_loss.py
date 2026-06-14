@@ -125,7 +125,15 @@ class Step04OptimizerConfig:
     optuna_sampler: str = "tpe"  # tpe | random | nsga2
     optuna_storage: str | None = None
     optuna_study_name: str | None = None
+    optuna_preseed_candidate_csv: str | None = None
+    optuna_preseed_candidate_limit: int = 0
+    optuna_preseed_only_accepted: bool = True
     optuna_objective: str = "metric_scalar"
+    optuna_adaptive_min_accepted_per_cell: int = 0
+    optuna_adaptive_trial_step: int = 0
+    optuna_adaptive_max_trials: int = 0
+    optuna_include_extended_parameters: bool = False
+    optuna_extend_parameter_space_when_large: bool = False
 
     hybrid_scipy_pre_nfev: int = 40
     hybrid_scipy_post_nfev: int = 20
@@ -159,6 +167,16 @@ class Step04OptimizerConfig:
             raise ValueError("scipy_f_scale must be positive")
         if int(self.optuna_n_trials) < 1:
             raise ValueError("optuna_n_trials must be >= 1")
+        if int(self.optuna_adaptive_min_accepted_per_cell) < 0:
+            raise ValueError("optuna_adaptive_min_accepted_per_cell must be >= 0")
+        if int(self.optuna_adaptive_trial_step) < 0:
+            raise ValueError("optuna_adaptive_trial_step must be >= 0")
+        if int(self.optuna_adaptive_max_trials) < 0:
+            raise ValueError("optuna_adaptive_max_trials must be >= 0")
+        if int(self.optuna_adaptive_max_trials) > 0 and int(self.optuna_adaptive_max_trials) < int(self.optuna_n_trials):
+            raise ValueError("optuna_adaptive_max_trials must be >= optuna_n_trials")
+        if int(self.optuna_adaptive_max_trials) > 0 and int(self.optuna_adaptive_trial_step) <= 0:
+            raise ValueError("optuna_adaptive_trial_step must be > 0 when optuna_adaptive_max_trials is set")
         if self.optuna_timeout_s is not None and float(self.optuna_timeout_s) <= 0:
             raise ValueError("optuna_timeout_s must be positive when provided")
         if int(self.hybrid_scipy_pre_nfev) < 1:
@@ -169,6 +187,8 @@ class Step04OptimizerConfig:
             raise ValueError("hybrid_refine_top_k must be >= 1")
         if int(self.candidate_top_k) < 1:
             raise ValueError("candidate_top_k must be >= 1")
+        if int(self.optuna_preseed_candidate_limit) < 0:
+            raise ValueError("optuna_preseed_candidate_limit must be >= 0")
 
         # Use the standard multi-objective sampler unless the caller explicitly requests another.
         if self.backend == "optuna_multi" and self.optuna_sampler == "tpe":
