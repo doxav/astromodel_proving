@@ -19,13 +19,13 @@
   },
   "n_input_candidates": 2110,
   "n_candidate_sweep_rows": 12660,
-  "n_windowed_mechanism_rows": 50564,
+  "n_windowed_mechanism_rows": 50568,
   "n_phenotype_tag_rows": 2110,
-  "n_successful_sweep_simulations": 12641,
+  "n_successful_sweep_simulations": 12642,
   "n_mechanism_clusters": 3,
   "n_independent_cells": 35,
   "cluster_evidence_status": "candidate_regime_screen",
   "cluster_evidence_reason": "sufficient_candidates_and_cells_for_screen",
   "headline_claim_scope": "accepted_compensation_or_mixed_mechanism_structure_pending_validation",
-  "elapsed_seconds": 359.2081050139968
+  "elapsed_seconds": 487.3855300150026
 }
