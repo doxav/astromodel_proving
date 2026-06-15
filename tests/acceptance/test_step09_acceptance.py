@@ -28,6 +28,11 @@ def test_step09_writes_reviewer_synthesis_outputs(project_root):
     links = result["reviewer_remark_artifact_links"]
     assert set(links["reviewer_id"]) == {"R1", "R2", "R3", "R4", "R5", "R6", "R7"}
     assert {"artifact", "notebook", "cell_reference", "impact_rank"}.issubset(links.columns)
+    assert list(links.columns[:3]) == [
+        "reviewer_id",
+        "impact_rank",
+        "usefulness_rationale",
+    ]
     value = result["degeneracy_scientific_value_statement"]
     assert value["current_status"].iloc[0] in {"allowed", "not_biologically_proven"}
     summary = json.loads((out_dir / "analysis_summary.json").read_text())

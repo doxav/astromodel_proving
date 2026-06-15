@@ -174,7 +174,21 @@ def build_reviewer_remark_artifact_links(project_root: Path | str) -> pd.DataFra
                 "usefulness_rationale": rationale,
             }
         )
-    return pd.DataFrame(out_rows).sort_values(["reviewer_id", "impact_rank"]).reset_index(drop=True)
+    columns = [
+        "reviewer_id",
+        "impact_rank",
+        "usefulness_rationale",
+        "source_step",
+        "notebook",
+        "cell_reference",
+        "artifact",
+        "artifact_exists",
+    ]
+    return (
+        pd.DataFrame(out_rows)[columns]
+        .sort_values(["reviewer_id", "impact_rank"])
+        .reset_index(drop=True)
+    )
 
 
 def build_mechanistic_pathway_perturbation_gate(project_root: Path | str) -> pd.DataFrame:

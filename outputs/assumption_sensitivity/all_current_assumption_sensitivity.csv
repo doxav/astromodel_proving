@@ -2,9 +2,9 @@ assumption_axis,region,condition,current_na,n_rows,support_fraction,sensitivity_
 gating_form,DH,CONTROL,50,42,1.0,stable
 gating_form,DH,CONTROL,75,42,1.0,stable
 gating_form,DH,CONTROL,100,42,1.0,stable
-gating_form,DH,CONTROL,125,42,0.9523809523809523,stable
-gating_form,DH,CONTROL,150,42,0.8809523809523809,stable
-gating_form,DH,CONTROL,175,42,0.9761904761904762,stable
+gating_form,DH,CONTROL,125,42,1.0,stable
+gating_form,DH,CONTROL,150,42,1.0,stable
+gating_form,DH,CONTROL,175,42,1.0,stable
 gating_form,DH,MFA,50,18,1.0,stable
 gating_form,DH,MFA,75,18,1.0,stable
 gating_form,DH,MFA,100,18,1.0,stable
@@ -16,7 +16,7 @@ gating_form,DH,MFA_BA,75,36,1.0,stable
 gating_form,DH,MFA_BA,100,36,1.0,stable
 gating_form,DH,MFA_BA,125,36,0.9444444444444444,stable
 gating_form,DH,MFA_BA,150,36,0.8611111111111112,stable
-gating_form,DH,MFA_BA,175,36,0.9166666666666666,stable
+gating_form,DH,MFA_BA,175,36,0.8611111111111112,stable
 gating_form,VH,MFA,50,36,1.0,stable
 gating_form,VH,MFA,75,36,1.0,stable
 gating_form,VH,MFA,100,36,1.0,stable
@@ -33,8 +33,8 @@ intracellular_K_as_ECS_proxy,DH,CONTROL,50,7,0.14285714285714285,current_sensiti
 intracellular_K_as_ECS_proxy,DH,CONTROL,75,7,0.14285714285714285,current_sensitive
 intracellular_K_as_ECS_proxy,DH,CONTROL,100,7,0.2857142857142857,current_sensitive
 intracellular_K_as_ECS_proxy,DH,CONTROL,125,7,0.2857142857142857,current_sensitive
-intracellular_K_as_ECS_proxy,DH,CONTROL,150,7,0.14285714285714285,current_sensitive
-intracellular_K_as_ECS_proxy,DH,CONTROL,175,7,0.14285714285714285,current_sensitive
+intracellular_K_as_ECS_proxy,DH,CONTROL,150,7,0.2857142857142857,current_sensitive
+intracellular_K_as_ECS_proxy,DH,CONTROL,175,7,0.2857142857142857,current_sensitive
 intracellular_K_as_ECS_proxy,DH,MFA,50,3,0.3333333333333333,current_sensitive
 intracellular_K_as_ECS_proxy,DH,MFA,75,3,0.3333333333333333,current_sensitive
 intracellular_K_as_ECS_proxy,DH,MFA,100,3,0.3333333333333333,current_sensitive
@@ -64,7 +64,7 @@ local_syncytial_compartment_split,DH,CONTROL,75,7,0.8571428571428571,stable
 local_syncytial_compartment_split,DH,CONTROL,100,7,1.0,stable
 local_syncytial_compartment_split,DH,CONTROL,125,7,0.8571428571428571,stable
 local_syncytial_compartment_split,DH,CONTROL,150,7,0.8571428571428571,stable
-local_syncytial_compartment_split,DH,CONTROL,175,7,1.0,stable
+local_syncytial_compartment_split,DH,CONTROL,175,7,0.8571428571428571,stable
 local_syncytial_compartment_split,DH,MFA,50,3,0.6666666666666666,current_sensitive
 local_syncytial_compartment_split,DH,MFA,75,3,1.0,stable
 local_syncytial_compartment_split,DH,MFA,100,3,1.0,stable
@@ -75,7 +75,7 @@ local_syncytial_compartment_split,DH,MFA_BA,50,6,0.5,current_sensitive
 local_syncytial_compartment_split,DH,MFA_BA,75,6,0.5,current_sensitive
 local_syncytial_compartment_split,DH,MFA_BA,100,6,0.5,current_sensitive
 local_syncytial_compartment_split,DH,MFA_BA,125,6,0.5,current_sensitive
-local_syncytial_compartment_split,DH,MFA_BA,150,6,0.6666666666666666,current_sensitive
+local_syncytial_compartment_split,DH,MFA_BA,150,6,0.5,current_sensitive
 local_syncytial_compartment_split,DH,MFA_BA,175,6,0.5,current_sensitive
 local_syncytial_compartment_split,VH,MFA,50,6,1.0,stable
 local_syncytial_compartment_split,VH,MFA,75,6,1.0,stable
