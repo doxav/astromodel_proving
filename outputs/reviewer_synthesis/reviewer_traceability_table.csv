@@ -3,6 +3,6 @@ R1,degeneracy versus non-identifiability/sloppiness,outputs/identifiability; out
 R2,"experimental variability, noise, and data constraints",outputs/provenance; outputs/features,supported,Cell/file is the independent unit; no paired animal-level claims are made.,False
 R3,model assumptions and proxy validity,outputs/assumption_sensitivity,partial,Explicit ECS/proxy variants remain required when proxy rows are limited.,False
 R4,Vm-only fits and physiological parameter plausibility,outputs/identifiability; outputs/parameter_plausibility,supported,Raw parameters are interpreted only when range and identifiability guardrails pass.,False
-R5,"pathways, mechanisms, and phenotypes",outputs/mechanisms; outputs/predictive_validation,supported,Phenotype tags are provisional until prediction and perturbation support mature.,False
-R6,held-out prediction and perturbation robustness,outputs/predictive_validation,supported,Prediction-limited or fit-only clusters are not biological degeneracy evidence.,False
+R5,"pathways, mechanisms, and phenotypes",outputs/mechanisms; outputs/legacy_mechanisms; outputs/predictive_validation; outputs/legacy_perturbation,supported,Phenotype tags and legacy perturbation matches are mechanistic screens; they are not biological degeneracy proof without upstream gates.,False
+R6,held-out prediction and perturbation robustness,outputs/predictive_validation; outputs/legacy_perturbation,supported,Prediction-limited or fit-only clusters are not biological degeneracy evidence.,False
 R7,"clarity, organization, units, and figure traceability",outputs/reviewer_synthesis/manuscript_asset_manifest.csv,supported,Figures/tables must cite source step outputs and conservative claim scope.,False

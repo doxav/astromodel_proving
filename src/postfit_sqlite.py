@@ -10,12 +10,21 @@ import numpy as np
 import pandas as pd
 
 from .astro_model import build_paramdict, compute_rhs_and_currents, normalize_flat_params, simulate_with_hidden_outputs
+from .contracts import canonical_condition
 from .parameter_space import effective_from_flat
 from .protocols import representative_context as _shared_representative_context, stim_window_seconds
 from .mechanisms import compute_flux_summary, compute_proxy_validity
 from .optuna_sqlite import TrialRecord, read_best_trial, read_top_trials
 
 DEFAULT_REPRESENTATIVE_DBS = ["CONTROL_75nA.db", "MFA_100nA.db", "BARIUM_100nA.db"]
+LEGACY_TOP_N_REQUESTED = 300
+FILTER_BASELINE_FOLD_GRID: dict[str, tuple[float, ...]] = {
+    "gki": (0.5, 0.75, 1.0, 1.25, 1.5, 2.0),
+    "P_gap_eff": (0.5, 0.75, 1.0, 1.25, 1.5, 2.0),
+    "gamma_s_eff": (0.5, 0.75, 1.0, 1.25, 1.5, 2.0),
+    "zth": (0.5, 0.75, 1.0, 1.25, 1.5),
+    "zs": (0.5, 0.75, 1.0, 1.25, 1.5),
+}
 
 
 @dataclass(frozen=True)
@@ -123,6 +132,163 @@ def top_trials_with_effective_parameters(initial_fit_dir: str | Path, top_n: int
     return df
 
 
+def build_legacy_configuration_library(
+    initial_fit_dir: str | Path,
+    *,
+    top_n: int = LEGACY_TOP_N_REQUESTED,
+    provenance_path: str | Path | None = None,
+) -> pd.DataFrame:
+    """Build the first-pass legacy top-N Optuna configuration library."""
+
+    if int(top_n) <= 0:
+        raise ValueError("top_n must be positive")
+    initial_dir = Path(initial_fit_dir)
+    provenance = pd.DataFrame()
+    if provenance_path is not None and Path(provenance_path).exists():
+        provenance = pd.read_csv(provenance_path)
+    provenance_cols = [
+        "db_name",
+        "status",
+        "chosen_status",
+        "trace_dataset_kind",
+        "chosen_trace_source",
+    ]
+    if not provenance.empty:
+        provenance = provenance[[c for c in provenance_cols if c in provenance.columns]].drop_duplicates("db_name")
+        provenance = provenance.rename(
+            columns={
+                "status": "provenance_status",
+                "chosen_status": "chosen_provenance_status",
+            }
+        )
+
+    rows: list[dict[str, Any]] = []
+    for db_path in sorted(initial_dir.glob("*.db")):
+        records = read_top_trials(db_path, top_n=int(top_n))
+        available = len(records)
+        for rank, record in enumerate(records, start=1):
+            condition = canonical_condition(record.condition)
+            rows.append(
+                {
+                    "source_scope": "legacy_single_current_optuna",
+                    "legacy_configuration_status": "legacy_top300_optuna_trial",
+                    "legacy_acceptance_rule": "not_thresholded_top_n_first_pass",
+                    "legacy_selection_rule": "top_n_by_objective",
+                    "legacy_top_n_requested": int(top_n),
+                    "legacy_top_n_available": int(available),
+                    "rank_in_db": int(rank),
+                    "db_name": record.db_name,
+                    "study_name": record.study_name,
+                    "condition": condition,
+                    "legacy_protocol_condition": record.condition,
+                    "current_na": int(record.current_na),
+                    "trial_id": int(record.trial_id),
+                    "trial_number": int(record.trial_number),
+                    "objective": float(record.objective),
+                    **record.params,
+                    **effective_parameters_from_flat(
+                        record.params, record.condition, record.current_na
+                    ),
+                }
+            )
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    if not provenance.empty:
+        out = out.merge(provenance, on="db_name", how="left", validate="many_to_one")
+    if "provenance_status" not in out.columns:
+        out["provenance_status"] = "not_available"
+    else:
+        out["provenance_status"] = out["provenance_status"].fillna("not_available")
+    return out.sort_values(["condition", "current_na", "rank_in_db"]).reset_index(drop=True)
+
+
+def legacy_configuration_status_by_db(legacy_library: pd.DataFrame) -> pd.DataFrame:
+    """Summarize first-pass legacy top-N status by DB."""
+
+    if legacy_library.empty:
+        return pd.DataFrame()
+    grouped = legacy_library.groupby(
+        ["db_name", "condition", "legacy_protocol_condition", "current_na"],
+        as_index=False,
+        dropna=False,
+    ).agg(
+        n_configurations=("trial_number", "nunique"),
+        legacy_top_n_requested=("legacy_top_n_requested", "first"),
+        legacy_top_n_available=("legacy_top_n_available", "first"),
+        best_objective=("objective", "min"),
+        worst_included_objective=("objective", "max"),
+        provenance_status=("provenance_status", "first"),
+    )
+    grouped["legacy_configuration_status"] = "legacy_top300_optuna_trial"
+    grouped["legacy_acceptance_rule"] = "not_thresholded_top_n_first_pass"
+    return grouped.sort_values(["condition", "current_na"]).reset_index(drop=True)
+
+
+def legacy_condition_parameter_ratios(legacy_library: pd.DataFrame) -> pd.DataFrame:
+    """Build candidate condition-ratio factors and fold-grid perturbation rows."""
+
+    parameters = ["P_gap_eff", "gamma_s_eff", "zth", "zs", "gki"]
+    condition_pairs = [
+        ("CONTROL", "MFA", "MFA_like_from_control_legacy"),
+        ("MFA", "MFA_BA", "MFA_BA_from_MFA_legacy"),
+        ("CONTROL", "MFA_BA", "MFA_BA_stacked_on_control_legacy"),
+    ]
+    rows: list[dict[str, Any]] = []
+    if not legacy_library.empty:
+        med = (
+            legacy_library.groupby(["condition", "current_na"], as_index=False)[parameters]
+            .median(numeric_only=True)
+        )
+        for cond1, cond2, context in condition_pairs:
+            for current_na in sorted(med["current_na"].dropna().unique()):
+                left = med[(med["condition"] == cond1) & (med["current_na"] == current_na)]
+                right = med[(med["condition"] == cond2) & (med["current_na"] == current_na)]
+                for parameter in parameters:
+                    factor = np.nan
+                    status = "missing_condition_pair"
+                    if not left.empty and not right.empty:
+                        denom = float(left[parameter].iloc[0])
+                        numer = float(right[parameter].iloc[0])
+                        if np.isfinite(denom) and abs(denom) > 1e-30 and np.isfinite(numer):
+                            factor = float(numer / denom)
+                            status = "candidate_ratio_available"
+                    rows.append(
+                        {
+                            "condition_pair": f"{cond1}_to_{cond2}",
+                            "perturbation_context": context,
+                            "current_na": int(current_na),
+                            "parameter": parameter,
+                            "factor": factor,
+                            "factor_source": "legacy_top_trial_ratio",
+                            "factor_status": status,
+                        }
+                    )
+    for context in [
+        "MFA_like_from_control_legacy",
+        "MFA_like_from_mfa_legacy",
+        "MFA_BA_from_MFA_legacy",
+        "MFA_BA_stacked_on_control_legacy",
+    ]:
+        for parameter, folds in FILTER_BASELINE_FOLD_GRID.items():
+            for fold in folds:
+                rows.append(
+                    {
+                        "condition_pair": "fold_grid",
+                        "perturbation_context": context,
+                        "current_na": -1,
+                        "parameter": parameter,
+                        "factor": float(fold),
+                        "factor_source": "filter_baseline_fold_grid",
+                        "factor_status": "first_pass_grid_factor",
+                    }
+                )
+    out = pd.DataFrame(rows)
+    return out.sort_values(
+        ["factor_source", "perturbation_context", "current_na", "parameter", "factor"]
+    ).reset_index(drop=True)
+
+
 def representative_mechanism_summary(initial_fit_dir: str | Path, representative_dbs: Sequence[str] | None = None, n_timepoints: int = 600) -> tuple[pd.DataFrame, dict[str, dict[str, Any]]]:
     initial_fit_dir = Path(initial_fit_dir)
     if representative_dbs is None:
@@ -193,6 +359,7 @@ def load_cached_postfit_tables(project_root: str | Path) -> dict[str, pd.DataFra
 def run_step01_postfit_sqlite(
     project_root: str | Path,
     top_n: int = 5,
+    legacy_top_n: int = LEGACY_TOP_N_REQUESTED,
     representative_dbs: Sequence[str] | None = None,
     output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
@@ -202,21 +369,46 @@ def run_step01_postfit_sqlite(
 
     if _raw_assets_available(paths["initial_fit_dir"]):
         top_trials_df = top_trials_with_effective_parameters(paths["initial_fit_dir"], top_n=top_n)
+        legacy_library = build_legacy_configuration_library(
+            paths["initial_fit_dir"],
+            top_n=legacy_top_n,
+            provenance_path=paths["project_root"]
+            / "outputs"
+            / "provenance"
+            / "control_trace_verification.csv",
+        )
         effective_df = effective_parameter_summary(paths["initial_fit_dir"])
         representative_df, simulations = representative_mechanism_summary(paths["initial_fit_dir"], representative_dbs=representative_dbs)
     else:
         cached = load_cached_postfit_tables(project_root)
         top_trials_df = cached["top_trials_all_dbs"].copy()
+        legacy_library = top_trials_df.copy()
+        legacy_library["source_scope"] = "legacy_single_current_optuna"
+        legacy_library["legacy_configuration_status"] = "legacy_top300_optuna_trial"
+        legacy_library["legacy_acceptance_rule"] = "not_thresholded_top_n_first_pass"
+        legacy_library["legacy_selection_rule"] = "top_n_by_objective"
+        legacy_library["legacy_top_n_requested"] = int(legacy_top_n)
+        legacy_library["legacy_top_n_available"] = legacy_library.groupby("db_name")["trial_number"].transform("nunique")
+        legacy_library["rank_in_db"] = legacy_library.groupby("db_name").cumcount() + 1
+        legacy_library["provenance_status"] = "cached_without_raw_provenance"
         effective_df = cached["effective_parameter_summary"].copy()
         representative_df = cached["representative_mechanism_summary"].copy()
         simulations = {}
+    status_by_db = legacy_configuration_status_by_db(legacy_library)
+    condition_ratios = legacy_condition_parameter_ratios(legacy_library)
 
     top_trials_df.to_csv(outputs_dir / "top_trials_all_dbs.csv", index=False)
     effective_df.to_csv(outputs_dir / "effective_parameter_summary.csv", index=False)
     representative_df.to_csv(outputs_dir / "representative_mechanism_summary.csv", index=False)
+    legacy_library.to_csv(outputs_dir / "legacy_configuration_library.csv", index=False)
+    status_by_db.to_csv(outputs_dir / "legacy_configuration_status_by_db.csv", index=False)
+    condition_ratios.to_csv(outputs_dir / "legacy_condition_parameter_ratios.csv", index=False)
 
     return {
         "top_trials_all_dbs": top_trials_df,
+        "legacy_configuration_library": legacy_library,
+        "legacy_configuration_status_by_db": status_by_db,
+        "legacy_condition_parameter_ratios": condition_ratios,
         "effective_parameter_summary": effective_df,
         "representative_mechanism_summary": representative_df,
         "representative_simulations": simulations,

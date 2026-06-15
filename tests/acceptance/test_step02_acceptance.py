@@ -19,6 +19,10 @@ def step02_results(project_root: Path, tmp_path_factory: pytest.TempPathFactory)
         "region_condition_cell_counts.csv",
         "region_effect_summary.csv",
         "redundancy_diagnostics.csv",
+        "experimental_kinetic_direction_targets.csv",
+        "region_specific_perturbation_direction_targets.csv",
+        "experimental_condition_contrast_summary.csv",
+        "experimental_region_condition_profile_terms.csv",
     }
     if expected.issubset({p.name for p in outputs_dir.glob("*.csv")}):
         return {
@@ -27,6 +31,8 @@ def step02_results(project_root: Path, tmp_path_factory: pytest.TempPathFactory)
             "redundancy_diagnostics": pd.read_csv(outputs_dir / "redundancy_diagnostics.csv"),
             "condition_feature_reliability": pd.read_csv(outputs_dir / "condition_feature_reliability.csv"),
             "condition_region_sweep_thresholds": pd.read_csv(outputs_dir / "condition_region_sweep_thresholds.csv"),
+            "experimental_kinetic_direction_targets": pd.read_csv(outputs_dir / "experimental_kinetic_direction_targets.csv"),
+            "region_specific_perturbation_direction_targets": pd.read_csv(outputs_dir / "region_specific_perturbation_direction_targets.csv"),
         }
     output_dir = tmp_path_factory.mktemp("step02_features")
     return run_step02_rebuild_atf_thresholds(project_root, output_dir=output_dir)
@@ -71,3 +77,19 @@ def test_step02_thresholds_include_reliability_and_condition_reliability(step02_
     assert {"condition", "region", "sweep", "feature", "median", "iqr", "acceptable_lower", "acceptable_upper", "missing_rate", "reliability_weight", "threshold_scope"}.issubset(thresholds.columns)
     assert "mean_reliability_weight" in condition_reliability.columns
     assert set(condition_reliability["condition"]) == {"CONTROL", "MFA", "MFA_BA"}
+
+
+def test_step02_writes_experimental_perturbation_targets(step02_results) -> None:
+    kinetic = step02_results["experimental_kinetic_direction_targets"]
+    regional = step02_results["region_specific_perturbation_direction_targets"]
+
+    assert {"CONTROL_to_MFA", "MFA_to_MFA_BA", "CONTROL_to_MFA_BA"}.issubset(
+        set(kinetic["experimental_contrast"])
+    )
+    assert {
+        "experimental_contrast",
+        "feature",
+        "experimental_direction",
+        "estimate",
+    }.issubset(kinetic.columns)
+    assert "delta_of_delta_DH_minus_VH" in set(regional["scope"])

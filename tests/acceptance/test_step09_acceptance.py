@@ -15,12 +15,21 @@ def test_step09_writes_reviewer_synthesis_outputs(project_root):
     for filename in [
         "reviewer_traceability_table.csv",
         "claim_maturity_table.csv",
+        "reviewer_remark_artifact_links.csv",
+        "mechanistic_pathway_perturbation_gate.csv",
+        "legacy_perturbation_claim_gate.csv",
+        "degeneracy_scientific_value_statement.csv",
         "manuscript_asset_manifest.csv",
         "analysis_summary.json",
     ]:
         assert (out_dir / filename).exists()
     traceability = result["reviewer_traceability_table"]
     assert set(traceability["reviewer_id"]) == {"R1", "R2", "R3", "R4", "R5", "R6", "R7"}
+    links = result["reviewer_remark_artifact_links"]
+    assert set(links["reviewer_id"]) == {"R1", "R2", "R3", "R4", "R5", "R6", "R7"}
+    assert {"artifact", "notebook", "cell_reference", "impact_rank"}.issubset(links.columns)
+    value = result["degeneracy_scientific_value_statement"]
+    assert value["current_status"].iloc[0] in {"allowed", "not_biologically_proven"}
     summary = json.loads((out_dir / "analysis_summary.json").read_text())
     assert summary["n_reviewer_rows"] == 7
 

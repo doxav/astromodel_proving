@@ -19,6 +19,10 @@ import pandas as pd
 
 from .astro_model import VALID_CURRENTS, build_paramdict, simulate_odeint, simulate_with_hidden_outputs
 from .atf_features import FEATURE_COLUMNS, extract_features_from_trace
+from .biological_perturbations import (
+    BiologicalPerturbationConfig,
+    run_legacy_biological_perturbations,
+)
 from .mechanisms import compute_flux_summary
 from .protocols import stim_window_seconds
 from .step05_mechanistic_decomposition import (
@@ -82,6 +86,9 @@ class Step06Config:
     robustness_K_o_final_max_mM: float = 7.0
     min_perturbation_feature_pass_fraction: float = 0.25
     min_robust_fraction: float = 0.50
+    run_legacy_biological_perturbations: bool = False
+    biological_max_configs_per_category: int | None = 2
+    biological_run_pair_sweeps: bool = True
     write_outputs: bool = True
     require_candidate_level_heldout: bool = True
     final_degeneracy_claim_allowed: bool = False
@@ -867,7 +874,10 @@ def compare_step06_runtime_presets(
     rows = []
     for preset, tp in [("coarse", 50), ("default", 80)]:
         cfg = Step06Config(
-            max_candidates=max_candidates, time_points=tp, write_outputs=False
+            max_candidates=max_candidates,
+            time_points=tp,
+            run_legacy_biological_perturbations=False,
+            write_outputs=False,
         )
         t0 = time.perf_counter()
         try:
@@ -917,6 +927,35 @@ def run_step06_predictive_validation(project_root: Path | str, config: Step06Con
     ppc = compute_feature_distribution_ppc(root, feature_predictions)
     perturb = run_perturbation_sweeps(candidates, config, root)
     robustness = build_robustness_summary(heldout, ppc, perturb, candidates, config)
+    biological_output_dir = (
+        None
+        if output_dir is None
+        else out_dir.parent / "legacy_perturbation"
+    )
+    biological = (
+        run_legacy_biological_perturbations(
+            root,
+            BiologicalPerturbationConfig(
+                time_points=int(config.time_points),
+                t_final_ms=float(config.t_final_ms),
+                max_configs_per_category=config.biological_max_configs_per_category,
+                run_pair_sweeps=bool(config.biological_run_pair_sweeps),
+                write_outputs=bool(config.write_outputs),
+            ),
+            output_dir=biological_output_dir,
+        )
+        if config.run_legacy_biological_perturbations
+        else {
+            "biological_perturbation_factor_table": pd.DataFrame(),
+            "biological_parameter_perturbation_sweeps": pd.DataFrame(),
+            "biological_parameter_direction_summary": pd.DataFrame(),
+            "biological_parameter_pair_sweeps": pd.DataFrame(),
+            "sigmoid_state_change_summary": pd.DataFrame(),
+            "experimental_direction_match_summary": pd.DataFrame(),
+            "phase_portrait_points": pd.DataFrame(),
+            "analysis_summary": {},
+        }
+    )
     perf = compare_step06_runtime_presets(root) if config.write_outputs else pd.DataFrame()
     summary = {
         "step_name": "Step 06 — Predictive validation and perturbation robustness",
@@ -926,6 +965,10 @@ def run_step06_predictive_validation(project_root: Path | str, config: Step06Con
         "n_prediction_interval_rows": int(len(intervals)),
         "n_ppc_rows": int(len(ppc)),
         "n_perturbation_rows": int(len(perturb)),
+        "legacy_biological_perturbation_enabled": bool(config.run_legacy_biological_perturbations),
+        "n_legacy_biological_perturbation_rows": int(
+            len(biological.get("biological_parameter_perturbation_sweeps", pd.DataFrame()))
+        ),
         "validation_labels": sorted(robustness["validation_label"].astype(str).unique().tolist()) if not robustness.empty else [],
         "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
         "elapsed_seconds": time.perf_counter() - t0,
@@ -941,4 +984,15 @@ def run_step06_predictive_validation(project_root: Path | str, config: Step06Con
         if not perf.empty:
             perf.to_csv(out_dir / "performance_benchmark.csv", index=False)
         (out_dir / "analysis_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    return {"heldout_current_errors": heldout, "prediction_intervals": intervals, "feature_distribution_ppc": ppc, "perturbation_sweeps": perturb, "robustness_summary": robustness, "candidate_feature_predictions": feature_predictions, "nominal_flux_predictions": nominal_flux, "performance_benchmark": perf, "analysis_summary": summary}
+    return {
+        "heldout_current_errors": heldout,
+        "prediction_intervals": intervals,
+        "feature_distribution_ppc": ppc,
+        "perturbation_sweeps": perturb,
+        "robustness_summary": robustness,
+        "candidate_feature_predictions": feature_predictions,
+        "nominal_flux_predictions": nominal_flux,
+        "performance_benchmark": perf,
+        **biological,
+        "analysis_summary": summary,
+    }

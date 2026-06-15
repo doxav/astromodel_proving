@@ -13,6 +13,12 @@ Step 06 operationalizes R6 by testing whether Step 04 cell-specific accepted ens
   - `outputs/features/region_pooled_condition_sweep_thresholds.csv`
   - `outputs/features/feature_reliability_weights.csv`
   - `outputs/features/feature_table_by_sweep.csv`
+- Optional source-scoped legacy perturbation inputs:
+  - `outputs/legacy_mechanisms/legacy_mechanism_categories.csv`
+  - `outputs/legacy_mechanisms/legacy_mechanistic_function_mapping.csv`
+  - `outputs/postfit_sqlite/legacy_condition_parameter_ratios.csv`
+  - `outputs/features/experimental_kinetic_direction_targets.csv`
+  - `outputs/features/region_specific_perturbation_direction_targets.csv`
 
 ## Outputs
 
@@ -27,6 +33,20 @@ All outputs are written under `outputs/predictive_validation/`:
 | `robustness_summary.csv` | Mechanism/region/condition-level validation labels: `predictive_supported`, `prediction_limited`, `fit_only`, or `insufficient_evidence`. |
 | `analysis_summary.json` | Machine-readable counts, configuration, and headline claim scope. |
 | `performance_benchmark.csv` | Coarse/default runtime comparison to support notebook/test tuning decisions. |
+
+When the source-scoped legacy biological perturbation layer is enabled, Step 06
+also writes under `outputs/legacy_perturbation/`:
+
+| File | Purpose |
+|---|---|
+| `biological_perturbation_factor_table.csv` | First-pass factor grid and factor provenance. |
+| `biological_parameter_perturbation_sweeps.csv` | One-dimensional perturbation rows with Vm, K_o, EF, sigmoid, status, and delta columns. |
+| `biological_parameter_direction_summary.csv` | Category/parameter/factor direction summaries. |
+| `biological_parameter_pair_sweeps.csv` | Two-dimensional perturbation grid rows. |
+| `sigmoid_state_change_summary.csv` | Counts of sigmoid state changes and phase transitions by category and perturbation. |
+| `experimental_direction_match_summary.csv` | Simulated membrane-kinetic direction versus ATF target direction comparisons. |
+| `phase_portrait_points.csv` | Static phase-space plotting table for parameter-pair grids. |
+| `analysis_summary.json` | Legacy perturbation configuration, row counts, and claim-scope status. |
 
 ## Scientific contract
 
@@ -47,6 +67,31 @@ The default lightweight perturbation panel tests:
 
 The default tests/notebook use a coarse grid; manuscript reruns may increase `time_points`, candidate count, and perturbation factors.
 
+## Source-scoped biological perturbation layer
+
+This optional layer is the first-pass implementation of the refined
+MFA/MFA+BA perturbation request. It must remain source-scoped to legacy
+configurations and must not be mixed with Step 04 accepted cell-specific
+ensembles.
+
+- Baselines are selected within legacy sigmoid/temporal/mechanism categories.
+- MFA-like contexts perturb `P_gap_eff`, `gamma_s_eff`, `zth`, and `zs`.
+- MFA+BA-like contexts perturb `gki`, either from legacy MFA baselines or
+  stacked on control baselines after MFA-like factors.
+- Fold grids come from the Filtered baseline sweep protocol; Naris-derived
+  magnitudes, I-V curves, biocytin conductance data, and movie outputs are
+  deferred.
+- Every row records baseline and perturbed Vm kinetics, K_o kinetics,
+  continuous EF score/delta, EF quadrant, sigmoid state at stimulation end,
+  sigmoid state at simulation end, temporal recruitment class,
+  `sigmoid_state_change`, `sigmoid_phase_transition`, simulation status, and
+  failure reason.
+- Simulated membrane-kinetic directions are compared against Step 02 ATF target
+  directions, including DH/VH regional delta-of-delta targets when available.
+- For legacy configurations, DH/VH regional matching is an alignment screen
+  against the experimental DH-minus-VH delta target. It is not a simulated
+  regional delta, because the legacy baselines are not region-assigned.
+
 ## Gherkin specifications
 
 ```gherkin
@@ -57,6 +102,17 @@ Feature: accepted ensembles predict held-out currents
     When Step 06 aggregates held-out-current predictions
     Then trace error and feature-pass metrics are reported for all six sweeps
     And rows are summarized by region, condition, and sweep
+```
+
+```gherkin
+@step06 @legacy @biological-perturbation
+Feature: source-scoped legacy categories are perturbed with MFA-like and MFA+BA-like factors
+  Scenario: category representatives are resimulated under one-dimensional and pair perturbations
+    Given legacy mechanism categories and experimental direction targets
+    When the biological perturbation layer runs
+    Then one-dimensional and two-dimensional perturbation CSVs are written
+    And each row reports Vm direction, K_o/EF direction, sigmoid state change, and simulation status
+    And simulated membrane directions are compared with experimental ATF direction targets
 ```
 
 ```gherkin
@@ -88,6 +144,9 @@ Feature: mechanism regimes are stress-tested by perturbation
   - Perturbation rows include explicit simulation statuses and hidden K-buffering metrics.
 - Acceptance:
   - Running Step 06 writes all required CSV/JSON outputs.
+  - Enabling the legacy biological perturbation layer writes the
+    `outputs/legacy_perturbation/*` CSVs and preserves explicit source-scope
+    labels.
   - PPC rows include `region`, `condition`, `sweep`, `feature`, empirical interval bounds, coverage, and reliability weight.
   - Robustness labels never use `candidate_degenerate_regimes` and downgrade unsupported clusters.
 - Integration:

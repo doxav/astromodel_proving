@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .atf_reference_adapter import default_reference_notebook, extract_reference_feature_table
+from .experimental_perturbation_targets import build_experimental_perturbation_targets
 from .provenance import EXPECTED_ATF_COUNTS, parse_atf_filename
 
 PRIMARY_FEATURES = [
@@ -340,6 +341,10 @@ def run_step02_rebuild_atf_thresholds(project_root: str | Path, output_dir: str 
     region_pooled = compute_thresholds(feature_df, reliability, threshold_scope="region_pooled")
     global_pooled = compute_thresholds(feature_df, reliability, threshold_scope="global_pooled")
     region_effects = compute_region_effect_summary(feature_df)
+    experimental_targets = build_experimental_perturbation_targets(
+        feature_df,
+        output_dir=outputs_dir,
+    )
 
     feature_df.to_csv(outputs_dir / "feature_table_by_sweep.csv", index=False)
     cell_counts.to_csv(outputs_dir / "region_condition_cell_counts.csv", index=False)
@@ -361,4 +366,5 @@ def run_step02_rebuild_atf_thresholds(project_root: str | Path, output_dir: str 
         "region_pooled_condition_sweep_thresholds": region_pooled,
         "global_pooled_sweep_thresholds": global_pooled,
         "region_effect_summary": region_effects,
+        **experimental_targets,
     }

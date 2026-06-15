@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 OUTPUT_SUBDIR = "reviewer_synthesis"
 
@@ -32,7 +33,12 @@ def _ensure_dir(path: Path) -> Path:
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
-    return pd.read_csv(path) if path.exists() else pd.DataFrame()
+    if not path.exists() or path.stat().st_size == 0:
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except EmptyDataError:
+        return pd.DataFrame()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -54,6 +60,7 @@ def build_reviewer_traceability_table(project_root: Path | str) -> pd.DataFrame:
     step03 = _read_csv(root / "outputs" / "identifiability" / "profile_summary.csv")
     step05_claims = _read_csv(root / "outputs" / "mechanisms" / "claim_scope_table.csv")
     step06 = _read_csv(root / "outputs" / "predictive_validation" / "robustness_summary.csv")
+    legacy_perturb = _read_csv(root / "outputs" / "legacy_perturbation" / "experimental_direction_match_summary.csv")
     step07 = _read_csv(root / "outputs" / "assumption_sensitivity" / "claim_scope_table.csv")
     step08 = _read_csv(root / "outputs" / "parameter_plausibility" / "interpretability_status.csv")
     atf = _read_csv(root / "outputs" / "features" / "feature_table_by_sweep.csv")
@@ -106,15 +113,15 @@ def build_reviewer_traceability_table(project_root: Path | str) -> pd.DataFrame:
         {
             "reviewer_id": "R5",
             "critique": "pathways, mechanisms, and phenotypes",
-            "primary_outputs": "outputs/mechanisms; outputs/predictive_validation",
+            "primary_outputs": "outputs/mechanisms; outputs/legacy_mechanisms; outputs/predictive_validation; outputs/legacy_perturbation",
             "evidence_status": "supported" if step06_supported else ("partial" if not step05_claims.empty else "unresolved"),
-            "claim_boundary": "Phenotype tags are provisional until prediction and perturbation support mature.",
+            "claim_boundary": "Phenotype tags and legacy perturbation matches are mechanistic screens; they are not biological degeneracy proof without upstream gates.",
         },
         {
             "reviewer_id": "R6",
             "critique": "held-out prediction and perturbation robustness",
-            "primary_outputs": "outputs/predictive_validation",
-            "evidence_status": "supported" if step06_supported else ("partial" if not step06.empty else "unresolved"),
+            "primary_outputs": "outputs/predictive_validation; outputs/legacy_perturbation",
+            "evidence_status": "supported" if step06_supported else ("partial" if (not step06.empty or not legacy_perturb.empty) else "unresolved"),
             "claim_boundary": "Prediction-limited or fit-only clusters are not biological degeneracy evidence.",
         },
         {
@@ -128,6 +135,142 @@ def build_reviewer_traceability_table(project_root: Path | str) -> pd.DataFrame:
     out = pd.DataFrame(rows)
     out["final_biological_degeneracy_claim_allowed"] = bool(final_degeneracy_allowed and step06_supported and not assumption_unresolved)
     return out
+
+
+def build_reviewer_remark_artifact_links(project_root: Path | str) -> pd.DataFrame:
+    """List reviewer remarks with ordered artifact links and notebook cells."""
+
+    root = Path(project_root).resolve()
+    rows = [
+        ("R1", 1, "Step 03", "analysis/03_combined_identifiability_profiles_fim.ipynb", "Effective parameter map / profile summary cells", "outputs/identifiability/profile_summary.csv", "Separates structural non-identifiability from stronger degeneracy language."),
+        ("R1", 2, "Step 05", "analysis/05_mechanistic_decomposition.ipynb", "Legacy mechanism/function mapping cells", "outputs/legacy_mechanisms/legacy_mechanistic_function_mapping.csv", "Shows FV-to-FK mechanistic mapping for top legacy Optuna configurations."),
+        ("R1", 3, "Step 09", "analysis/09_reviewer_response_synthesis.ipynb", "Claim maturity and degeneracy value cells", "outputs/reviewer_synthesis/degeneracy_scientific_value_statement.csv", "States what remains before biological degeneracy can be claimed."),
+        ("R2", 1, "Step 02", "analysis/02_rebuild_atf_thresholds.ipynb", "Feature table and region-condition threshold cells", "outputs/features/feature_table_by_sweep.csv", "Primary ATF-derived kinetic data and independent cell/sweep accounting."),
+        ("R2", 2, "Step 02", "analysis/02_rebuild_atf_thresholds.ipynb", "Second-layer regional perturbation cells", "outputs/features/experimental_second_layer/matched_sweep_delta_of_delta.csv", "Quantifies DH/VH response differences under MFA and MFA+BA."),
+        ("R3", 1, "Step 07", "analysis/07_assumption_sensitivity.ipynb", "Assumption gate cells", "outputs/assumption_sensitivity/claim_scope_table.csv", "Documents model-dependence and assumption-sensitive claims."),
+        ("R3", 2, "Step 08", "analysis/08_parameter_plausibility_and_constrained_reruns.ipynb", "Parameter semantics cells", "outputs/parameter_plausibility/parameter_semantics_audit.csv", "Prevents reduced-model proxies from being overinterpreted anatomically."),
+        ("R4", 1, "Step 08", "analysis/08_parameter_plausibility_and_constrained_reruns.ipynb", "Interpretability status cells", "outputs/parameter_plausibility/interpretability_status.csv", "Audits direct physiology versus effective-coordinate interpretation."),
+        ("R4", 2, "Step 01", "analysis/01_postfit_sqlite_pipeline.ipynb", "Legacy top-N configuration library cells", "outputs/postfit_sqlite/legacy_configuration_library.csv", "Provides top legacy Optuna parameter library and source status."),
+        ("R5", 1, "Step 05", "analysis/05_mechanistic_decomposition.ipynb", "Legacy sigmoid/K_o EF category cells", "outputs/legacy_mechanisms/legacy_mechanism_categories.csv", "Defines open/partial/closed and temporal recruitment categories."),
+        ("R5", 2, "Step 06", "analysis/06_predictive_validation_and_perturbation.ipynb", "Biological perturbation layer cells", "outputs/legacy_perturbation/biological_parameter_direction_summary.csv", "Tests how mechanistic classes respond to MFA-like and MFA+BA-like perturbations."),
+        ("R5", 3, "Step 06", "analysis/06_predictive_validation_and_perturbation.ipynb", "Sigmoid transition visualization cells", "outputs/legacy_perturbation/sigmoid_state_change_summary.csv", "Shows whether perturbations change the sigmoid state category."),
+        ("R6", 1, "Step 06", "analysis/06_predictive_validation_and_perturbation.ipynb", "Held-out prediction and robustness cells", "outputs/predictive_validation/robustness_summary.csv", "Primary conservative prediction/perturbation support table."),
+        ("R6", 2, "Step 06", "analysis/06_predictive_validation_and_perturbation.ipynb", "Experimental direction matching cells", "outputs/legacy_perturbation/experimental_direction_match_summary.csv", "Compares simulated kinetic directions against ATF perturbation targets."),
+        ("R7", 1, "Step 09", "analysis/09_reviewer_response_synthesis.ipynb", "Manifest and traceability cells", "outputs/reviewer_synthesis/manuscript_asset_manifest.csv", "Lists reviewer-facing artifacts and missing/pending assets."),
+        ("R7", 2, "Step 09", "analysis/09_reviewer_response_synthesis.ipynb", "Reviewer remark link ledger cells", "outputs/reviewer_synthesis/reviewer_remark_artifact_links.csv", "Provides ordered links from each reviewer remark to the most useful generated artifacts."),
+    ]
+    out_rows = []
+    for reviewer_id, rank, step, notebook, cell_reference, artifact, rationale in rows:
+        path = root / artifact
+        out_rows.append(
+            {
+                "reviewer_id": reviewer_id,
+                "impact_rank": int(rank),
+                "source_step": step,
+                "notebook": notebook,
+                "cell_reference": cell_reference,
+                "artifact": artifact,
+                "artifact_exists": bool(path.exists()),
+                "usefulness_rationale": rationale,
+            }
+        )
+    return pd.DataFrame(out_rows).sort_values(["reviewer_id", "impact_rank"]).reset_index(drop=True)
+
+
+def build_mechanistic_pathway_perturbation_gate(project_root: Path | str) -> pd.DataFrame:
+    """Gate mechanistic pathway claims from legacy perturbation direction matches."""
+
+    root = Path(project_root).resolve()
+    matches = _read_csv(root / "outputs" / "legacy_perturbation" / "experimental_direction_match_summary.csv")
+    sigmoid = _read_csv(root / "outputs" / "legacy_perturbation" / "sigmoid_state_change_summary.csv")
+    if matches.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "gate": "mechanistic_pathway_perturbation",
+                    "gate_status": "missing_evidence",
+                    "allowed_claim": "not_allowed",
+                    "remaining_requirement": "run Step 06 legacy biological perturbation layer",
+                }
+            ]
+        )
+    grouped = matches.groupby(["perturbation_context", "feature"], as_index=False).agg(
+        n_rows=("direction_match_status", "size"),
+        n_match=("direction_match_status", lambda s: int((s.astype(str) == "match").sum())),
+        n_opposite=("direction_match_status", lambda s: int((s.astype(str) == "opposite").sum())),
+        n_undefined=("direction_match_status", lambda s: int((s.astype(str) == "undefined").sum())),
+    )
+    grouped["match_fraction"] = grouped["n_match"] / grouped["n_rows"].replace(0, np.nan)
+    grouped["sigmoid_transition_rows_available"] = int(len(sigmoid))
+    grouped["gate_status"] = np.where(
+        grouped["match_fraction"].fillna(0.0) >= 0.5,
+        "screen_consistent_with_experimental_direction",
+        "screen_not_consistent_or_inconclusive",
+    )
+    grouped["allowed_claim"] = "mechanistic_screen_only_not_biological_proof"
+    grouped["remaining_requirement"] = (
+        "requires broader category coverage, assumption robustness, parameter semantics, and external validation before biological degeneracy wording"
+    )
+    return grouped
+
+
+def build_legacy_perturbation_claim_gate(project_root: Path | str) -> pd.DataFrame:
+    """Build a conservative high-level claim gate for the legacy perturbation layer."""
+
+    root = Path(project_root).resolve()
+    summary = _read_json(root / "outputs" / "legacy_perturbation" / "analysis_summary.json")
+    matches = _read_csv(root / "outputs" / "legacy_perturbation" / "experimental_direction_match_summary.csv")
+    if not summary or matches.empty:
+        status = "missing_or_not_run"
+        match_fraction = np.nan
+    else:
+        match_fraction = float((matches["direction_match_status"].astype(str) == "match").mean())
+        status = "first_pass_screen_complete"
+    return pd.DataFrame(
+        [
+            {
+                "gate": "legacy_perturbation_claim",
+                "gate_status": status,
+                "n_selected_baselines": int(summary.get("n_selected_baselines", 0)),
+                "n_one_dimensional_rows": int(summary.get("n_one_dimensional_rows", 0)),
+                "n_pair_sweep_rows": int(summary.get("n_pair_sweep_rows", 0)),
+                "direction_match_fraction": match_fraction,
+                "allowed_claim": "legacy_category_perturbation_screen",
+                "forbidden_claim": "biologically_proven_degeneracy_or_anatomical_syncytium_count",
+                "remaining_requirement": "full validation requires expanded baselines, external perturbation magnitudes if used, assumption gates, and parameter interpretation gates",
+            }
+        ]
+    )
+
+
+def build_degeneracy_scientific_value_statement(project_root: Path | str) -> pd.DataFrame:
+    """State the objective value of the current evidence if degeneracy is not proven."""
+
+    root = Path(project_root).resolve()
+    final_gate = _read_csv(root / "outputs" / "reviewer_synthesis" / "restricted_all_gate_join.csv")
+    final_allowed = (
+        not final_gate.empty
+        and "restricted_degeneracy_claim_allowed" in final_gate
+        and final_gate["restricted_degeneracy_claim_allowed"].astype(bool).any()
+    )
+    return pd.DataFrame(
+        [
+            {
+                "topic": "biological_degeneracy_claim",
+                "current_status": "allowed" if final_allowed else "not_biologically_proven",
+                "objective_scientific_value": (
+                    "The current pipeline can still identify constrained model mechanisms, effective-coordinate tradeoffs, K_o functional consequences, and perturbation-response hypotheses. "
+                    "These are valuable as falsifiable mechanistic screens and reviewer-facing guardrails, even when they do not prove biological degeneracy."
+                ),
+                "remaining_before_stronger_claim": (
+                    "Need concurrent support from identifiability, predictive validation, perturbation direction matching, assumption robustness, parameter plausibility, and external biological calibration."
+                ),
+                "forbidden_overstatement": (
+                    "Do not claim anatomical syncytium size from gamma_s_eff * Chi(t), direct physiological parameter truth from fitted effective coordinates, or proven biological degeneracy from model-equivalent fits alone."
+                ),
+            }
+        ]
+    )
 
 
 def build_claim_maturity_table(project_root: Path | str) -> pd.DataFrame:
@@ -258,10 +401,21 @@ def build_manuscript_asset_manifest(project_root: Path | str) -> pd.DataFrame:
         ("Step 05", "outputs/mechanisms/accepted_fit_mechanisms.csv", "Hidden-current flux decomposition"),
         ("Step 05", "outputs/mechanisms/accepted_fit_mechanisms_windowed.csv", "Windowed local/spatial mechanism characterization"),
         ("Step 05", "outputs/mechanisms/buffering_phenotype_tags.csv", "Provisional phenotype tags"),
+        ("Step 05 legacy", "outputs/legacy_mechanisms/legacy_mechanism_categories.csv", "Legacy sigmoid/temporal mechanism categories"),
+        ("Step 05 legacy", "outputs/legacy_mechanisms/legacy_function_efficiency_by_configuration.csv", "Legacy K_o EF score and descriptive quadrant table"),
+        ("Step 05 legacy", "outputs/legacy_mechanisms/legacy_mechanistic_function_mapping.csv", "Legacy FV-to-FK mechanistic function mapping"),
         ("Step 06", "outputs/predictive_validation/robustness_summary.csv", "Prediction and perturbation robustness"),
+        ("Step 06 legacy", "outputs/legacy_perturbation/biological_parameter_direction_summary.csv", "Legacy MFA/MFA+BA-like direction summaries"),
+        ("Step 06 legacy", "outputs/legacy_perturbation/experimental_direction_match_summary.csv", "Legacy perturbation direction match summary"),
+        ("Step 06 legacy", "outputs/legacy_perturbation/sigmoid_state_change_summary.csv", "Sigmoid state changes under biological perturbation sweeps"),
+        ("Step 06 legacy", "outputs/legacy_perturbation/phase_portrait_points.csv", "2D phase-space points for perturbation visualization"),
         ("Step 07", "outputs/assumption_sensitivity/claim_scope_table.csv", "Assumption-sensitivity claim scope"),
         ("Step 08", "outputs/parameter_plausibility/interpretability_status.csv", "Parameter interpretability guardrails"),
         ("Step 09", "outputs/reviewer_synthesis/reviewer_traceability_table.csv", "R1-R7 response map"),
+        ("Step 09", "outputs/reviewer_synthesis/reviewer_remark_artifact_links.csv", "R1-R7 ordered links to useful result artifacts and notebook cells"),
+        ("Step 09", "outputs/reviewer_synthesis/mechanistic_pathway_perturbation_gate.csv", "Mechanistic pathway perturbation gate"),
+        ("Step 09", "outputs/reviewer_synthesis/legacy_perturbation_claim_gate.csv", "Legacy perturbation claim gate"),
+        ("Step 09", "outputs/reviewer_synthesis/degeneracy_scientific_value_statement.csv", "Objective scientific value statement when biological degeneracy is not proven"),
         ("Selected action 1", "outputs/predictive_validation/phenotype_robustness_summary.csv", "Phenotype robustness by mechanism/stratum"),
         ("Selected action 1", "outputs/reviewer_synthesis/stratum_support_gate.csv", "Region-condition support gates"),
         ("Selected action 1", "outputs/predictive_validation/prediction_limited_failure_modes.csv", "Prediction-limited failure decomposition"),
@@ -318,9 +472,20 @@ def run_step09_reviewer_synthesis(
     start = time.perf_counter()
     traceability = build_reviewer_traceability_table(root)
     maturity = build_claim_maturity_table(root)
+    pathway_gate = build_mechanistic_pathway_perturbation_gate(root)
+    legacy_gate = build_legacy_perturbation_claim_gate(root)
+    degeneracy_value = build_degeneracy_scientific_value_statement(root)
     if cfg.write_outputs:
         traceability.to_csv(out_dir / "reviewer_traceability_table.csv", index=False)
         maturity.to_csv(out_dir / "claim_maturity_table.csv", index=False)
+        pathway_gate.to_csv(out_dir / "mechanistic_pathway_perturbation_gate.csv", index=False)
+        legacy_gate.to_csv(out_dir / "legacy_perturbation_claim_gate.csv", index=False)
+        degeneracy_value.to_csv(out_dir / "degeneracy_scientific_value_statement.csv", index=False)
+    reviewer_links = build_reviewer_remark_artifact_links(root)
+    if cfg.write_outputs:
+        reviewer_links.to_csv(out_dir / "reviewer_remark_artifact_links.csv", index=False)
+        reviewer_links = build_reviewer_remark_artifact_links(root)
+        reviewer_links.to_csv(out_dir / "reviewer_remark_artifact_links.csv", index=False)
     manifest = build_manuscript_asset_manifest(root)
     final_allowed = bool(traceability["final_biological_degeneracy_claim_allowed"].all())
     summary = {
@@ -329,6 +494,8 @@ def run_step09_reviewer_synthesis(
         "n_reviewer_rows": int(len(traceability)),
         "n_claim_rows": int(len(maturity)),
         "n_manifest_rows": int(len(manifest)),
+        "n_reviewer_link_rows": int(len(reviewer_links)),
+        "n_pathway_gate_rows": int(len(pathway_gate)),
         "missing_manifest_artifacts": manifest.loc[~manifest["exists"].astype(bool), "artifact"].astype(str).tolist(),
         "final_biological_degeneracy_claim_allowed": final_allowed,
         "headline_claim_scope": "Final degeneracy wording is allowed only if all upstream evidence layers are supported.",
@@ -342,6 +509,10 @@ def run_step09_reviewer_synthesis(
     return {
         "reviewer_traceability_table": traceability,
         "claim_maturity_table": maturity,
+        "reviewer_remark_artifact_links": reviewer_links,
+        "mechanistic_pathway_perturbation_gate": pathway_gate,
+        "legacy_perturbation_claim_gate": legacy_gate,
+        "degeneracy_scientific_value_statement": degeneracy_value,
         "manuscript_asset_manifest": manifest,
         "analysis_summary": summary,
     }

@@ -2,6 +2,7 @@
   "step_name": "Step 05 \u2014 Mechanistic decomposition of accepted cell ensembles",
   "input_source": "outputs/cell_fits/accepted_cell_ensembles.csv",
   "config": {
+    "step04_source_path": null,
     "max_candidates": null,
     "time_points": 120,
     "t_final_ms": 50000.0,
@@ -15,17 +16,23 @@
     "min_cells_for_multicluster": 3,
     "min_cells_per_cluster": 2,
     "proxy_failure_downgrade_fraction": 0.5,
+    "run_legacy_mapping": true,
+    "legacy_top_n_per_db": 300,
+    "legacy_max_configs": null,
+    "legacy_min_rows_per_efficiency_stratum": 10,
     "write_outputs": true
   },
-  "n_input_candidates": 2110,
-  "n_candidate_sweep_rows": 12660,
-  "n_windowed_mechanism_rows": 50568,
-  "n_phenotype_tag_rows": 2110,
-  "n_successful_sweep_simulations": 12642,
+  "n_input_candidates": 353,
+  "n_candidate_sweep_rows": 2118,
+  "n_windowed_mechanism_rows": 8416,
+  "n_phenotype_tag_rows": 353,
+  "n_successful_sweep_simulations": 2104,
   "n_mechanism_clusters": 3,
-  "n_independent_cells": 35,
+  "n_independent_cells": 29,
   "cluster_evidence_status": "candidate_regime_screen",
   "cluster_evidence_reason": "sufficient_candidates_and_cells_for_screen",
   "headline_claim_scope": "accepted_compensation_or_mixed_mechanism_structure_pending_validation",
-  "elapsed_seconds": 487.3855300150026
+  "legacy_mapping_enabled": true,
+  "n_legacy_category_rows": 5400,
+  "elapsed_seconds": 247.3478045790107
 }

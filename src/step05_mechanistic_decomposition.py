@@ -25,7 +25,13 @@ from .astro_model import (
     VALID_CURRENTS,
     simulate_with_hidden_outputs,
 )
-from .contracts import protocol_condition
+from .contracts import canonical_condition, protocol_condition
+from .functional_mapping import (
+    apply_efficiency_quadrants,
+    compute_efficiency_threshold_table,
+    extract_ko_kinetic_features,
+    extract_sigmoid_state_features,
+)
 from .mechanisms import compute_flux_summary, compute_proxy_validity
 from .phenotype_classifier import (
     build_mode_vectors,
@@ -33,9 +39,15 @@ from .phenotype_classifier import (
     measure_registry_table,
     summarize_phenotypes,
 )
+from .postfit_sqlite import (
+    LEGACY_TOP_N_REQUESTED,
+    build_legacy_configuration_library,
+    run_step01_postfit_sqlite,
+)
 from .protocols import stim_window_seconds
 
 OUTPUT_SUBDIR = "mechanisms"
+LEGACY_OUTPUT_SUBDIR = "legacy_mechanisms"
 EFFECTIVE_COLUMNS = ["P_gap_eff", "gamma_t_eff", "gamma_s_eff", "volume_ratio_wa_wo"]
 IDENTITY_COLUMNS = ["file_id", "region", "condition", "candidate_id"]
 MECHANISM_FEATURES = [
@@ -73,6 +85,10 @@ class Step05Config:
     min_cells_for_multicluster: int = 3
     min_cells_per_cluster: int = 2
     proxy_failure_downgrade_fraction: float = 0.5
+    run_legacy_mapping: bool = True
+    legacy_top_n_per_db: int = LEGACY_TOP_N_REQUESTED
+    legacy_max_configs: int | None = None
+    legacy_min_rows_per_efficiency_stratum: int = 10
     write_outputs: bool = True
 
 
@@ -774,6 +790,7 @@ def compare_simulation_grid_performance(
             max_candidates=max_candidates,
             time_points=points,
             bootstrap_iterations=0,
+            run_legacy_mapping=False,
             write_outputs=False,
         )
         t0 = time.perf_counter()
@@ -795,6 +812,358 @@ def compare_simulation_grid_performance(
             }
         )
     return pd.DataFrame(rows)
+
+
+def _legacy_candidate_id(row: Mapping[str, Any]) -> str:
+    return f"{row.get('db_name')}::trial_{int(row.get('trial_number'))}"
+
+
+def _load_legacy_configuration_library(root: Path, config: Step05Config) -> pd.DataFrame:
+    path = root / "outputs" / "postfit_sqlite" / "legacy_configuration_library.csv"
+    if not path.exists():
+        run_step01_postfit_sqlite(root, legacy_top_n=int(config.legacy_top_n_per_db))
+    if path.exists():
+        df = pd.read_csv(path)
+    else:
+        df = build_legacy_configuration_library(
+            root / "data" / "1_Initial_xp_fit",
+            top_n=int(config.legacy_top_n_per_db),
+            provenance_path=root / "outputs" / "provenance" / "control_trace_verification.csv",
+        )
+    if config.legacy_max_configs is not None:
+        df = df.sort_values(["condition", "current_na", "rank_in_db"]).head(
+            int(config.legacy_max_configs)
+        )
+    return df.reset_index(drop=True)
+
+
+def _legacy_flat_params(row: Mapping[str, Any]) -> dict[str, Any]:
+    keys = [
+        "gki",
+        "pk",
+        "d",
+        "gs",
+        "gt",
+        "zth",
+        "zs",
+        "eps",
+        "gl_a",
+        "wo",
+        "w_a",
+        "ca",
+        "Va_l",
+        "Va_s",
+        "switching_function",
+        "K_bath_value_middle",
+        "eps_middle",
+        "wo_middle",
+    ]
+    params = {key: row[key] for key in keys if key in row and pd.notna(row[key])}
+    if "switching_function" not in params:
+        params["switching_function"] = "sigmoid"
+    return params
+
+
+def _simulate_legacy_configuration(
+    row: Mapping[str, Any], config: Step05Config
+) -> tuple[dict[str, Any], pd.DataFrame]:
+    condition = canonical_condition(str(row["condition"]))
+    current_na = int(row["current_na"])
+    sweep_index = (
+        list(VALID_CURRENTS).index(current_na) + 1
+        if current_na in VALID_CURRENTS
+        else int(row.get("rank_in_db", 1))
+    )
+    window_s = stim_window_seconds(condition)
+    params = _legacy_flat_params(row)
+    time_ms = _time_grid(config)
+    base = {
+        "source_scope": str(row.get("source_scope", "legacy_single_current_optuna")),
+        "legacy_configuration_status": str(
+            row.get("legacy_configuration_status", "legacy_top300_optuna_trial")
+        ),
+        "legacy_selection_rule": str(row.get("legacy_selection_rule", "top_n_by_objective")),
+        "legacy_acceptance_rule": str(
+            row.get("legacy_acceptance_rule", "not_thresholded_top_n_first_pass")
+        ),
+        "db_name": str(row["db_name"]),
+        "study_name": str(row.get("study_name", "")),
+        "file_id": str(row["db_name"]).replace(".db", ""),
+        "region": "legacy_unassigned",
+        "condition": condition,
+        "legacy_protocol_condition": str(row.get("legacy_protocol_condition", protocol_condition(condition))),
+        "current_na": current_na,
+        "sweep": int(sweep_index),
+        "candidate_id": _legacy_candidate_id(row),
+        "trial_id": int(row.get("trial_id", -1)),
+        "trial_number": int(row["trial_number"]),
+        "objective": float(row["objective"]),
+        "rank_in_db": int(row.get("rank_in_db", 0)),
+        "stim_window_start_s": float(window_s[0]),
+        "stim_window_end_s": float(window_s[1]),
+    }
+    for column in EFFECTIVE_COLUMNS + ["gki", "pk", "d", "gs", "gt", "zth", "zs", "eps", "gl_a"]:
+        if column in row:
+            base[column] = row[column]
+    try:
+        sim = simulate_with_hidden_outputs(
+            params,
+            {
+                "experiment_type": protocol_condition(condition),
+                "current_na": current_na,
+                "t_eval_ms": time_ms,
+            },
+        )
+        flux = compute_flux_summary(sim, stim_window_s=window_s)
+        proxy = compute_proxy_validity(sim, window_s=window_s)
+        ko_features = extract_ko_kinetic_features(
+            np.asarray(sim["t_ms"], dtype=float) / 1000.0,
+            np.asarray(sim["derived"]["K_o"], dtype=float),
+            onset_s=window_s[0],
+            offset_s=window_s[1],
+        )
+        sigmoid = extract_sigmoid_state_features(sim, stim_window_s=window_s)
+        windowed = compute_windowed_buffering_scores(
+            sim,
+            stim_window_s=window_s,
+            metadata=base,
+        )
+        out = {
+            **base,
+            **flux,
+            **ko_features,
+            **sigmoid,
+            "proxy_pearson_r": proxy["pearson_r"],
+            "proxy_spearman_r": proxy["spearman_r"],
+            "proxy_rmse_after_scaling": proxy["rmse_after_scaling"],
+            "proxy_validity_class": proxy["validity_class"],
+            "simulation_status": "ok",
+            "failure_reason": "",
+        }
+    except Exception as exc:  # noqa: BLE001 - explicit failure rows are required
+        out = {
+            **base,
+            "simulation_status": "failed",
+            "failure_reason": f"{type(exc).__name__}: {exc}",
+            "proxy_validity_class": "failed",
+        }
+        windowed = pd.DataFrame()
+    return out, windowed
+
+
+def run_legacy_mechanistic_mapping(
+    project_root: Path | str,
+    config: Step05Config,
+    output_dir: Path | str | None = None,
+) -> dict[str, pd.DataFrame | dict[str, Any]]:
+    """Run the legacy top-N FV-to-FK mechanism/function mapping layer."""
+
+    root = Path(project_root).resolve()
+    out_dir = _ensure_dir(
+        Path(output_dir).resolve()
+        if output_dir is not None
+        else root / "outputs" / LEGACY_OUTPUT_SUBDIR
+    )
+    library = _load_legacy_configuration_library(root, config)
+    rows: list[dict[str, Any]] = []
+    windowed_tables: list[pd.DataFrame] = []
+    for _, candidate in library.iterrows():
+        row, windowed = _simulate_legacy_configuration(candidate.to_dict(), config)
+        rows.append(row)
+        if not windowed.empty:
+            windowed_tables.append(windowed)
+    fit_mechanisms = pd.DataFrame(rows)
+    windowed = pd.concat(windowed_tables, ignore_index=True) if windowed_tables else pd.DataFrame()
+    ok = fit_mechanisms[fit_mechanisms["simulation_status"].eq("ok")].copy()
+    thresholds = compute_efficiency_threshold_table(
+        ok,
+        min_rows_per_stratum=int(config.legacy_min_rows_per_efficiency_stratum),
+    ) if not ok.empty else pd.DataFrame()
+    fit_with_eff = (
+        apply_efficiency_quadrants(fit_mechanisms, thresholds)
+        if not thresholds.empty
+        else fit_mechanisms.copy()
+    )
+    if not windowed.empty:
+        mode_vectors = build_mode_vectors(windowed)
+        phenotype_tags = summarize_phenotypes(windowed)
+    else:
+        mode_vectors = pd.DataFrame()
+        phenotype_tags = pd.DataFrame()
+
+    category_cols = [
+        "source_scope",
+        "legacy_configuration_status",
+        "legacy_selection_rule",
+        "legacy_acceptance_rule",
+        "db_name",
+        "file_id",
+        "region",
+        "condition",
+        "current_na",
+        "trial_number",
+        "candidate_id",
+        "rank_in_db",
+        "objective",
+        "simulation_status",
+        "failure_reason",
+        "sigmoid_value_at_stim_end",
+        "sigmoid_value_at_sim_end",
+        "sigmoid_peak_during_stim",
+        "sigmoid_state_at_stim_end_10_90",
+        "sigmoid_state_at_sim_end_10_90",
+        "sigmoid_peak_state_during_stim_10_90",
+        "temporal_recruitment_class",
+        "Ko_efficiency_score",
+        "Ko_efficiency_quadrant",
+        "Ko_efficiency_status",
+    ]
+    mechanism_categories = fit_with_eff[[c for c in category_cols if c in fit_with_eff.columns]].copy()
+    if not phenotype_tags.empty:
+        mechanism_categories = mechanism_categories.merge(
+            phenotype_tags,
+            on=["file_id", "region", "condition", "candidate_id"],
+            how="left",
+        )
+    if not windowed.empty:
+        m_tot = windowed[windowed["window"].eq("M_tot")].copy()
+        extra_cols = [
+            "file_id",
+            "region",
+            "condition",
+            "candidate_id",
+            "sigmoid_gate_end_state_10_90",
+            "dKs_activation_score",
+            "alpha2_available_surface_proxy",
+            "recruited_surface_alpha2_x_A_dKs",
+            "long_range_distribution_fraction",
+            "kir_current_score",
+            "voltage_coupling_score",
+            "mechanistic_mode_signed_flux",
+            "buffering_phenotype",
+        ]
+        m_tot = m_tot[[c for c in extra_cols if c in m_tot.columns]].drop_duplicates(
+            ["file_id", "region", "condition", "candidate_id"]
+        )
+        mechanism_categories = mechanism_categories.merge(
+            m_tot,
+            on=["file_id", "region", "condition", "candidate_id"],
+            how="left",
+            suffixes=("", "_M_tot"),
+        )
+        mechanism_categories["gj_ionic_state_10_90"] = mechanism_categories.get(
+            "sigmoid_gate_end_state_10_90", mechanism_categories.get("sigmoid_state_at_sim_end_10_90")
+        )
+        mechanism_categories["functional_n_flux_proxy_dKs_activation"] = mechanism_categories.get("dKs_activation_score")
+        mechanism_categories["functional_n_end_proxy_chi_end"] = mechanism_categories.get("sigmoid_value_at_sim_end")
+    else:
+        mechanism_categories["gj_ionic_state_10_90"] = mechanism_categories.get("sigmoid_state_at_sim_end_10_90")
+    category_components = [
+        "condition",
+        "current_na",
+        "sigmoid_state_at_sim_end_10_90",
+        "sigmoid_state_at_stim_end_10_90",
+        "temporal_recruitment_class",
+        "gj_ionic_state_10_90",
+    ]
+    available_category_components = [
+        col for col in category_components if col in mechanism_categories.columns
+    ]
+    if available_category_components:
+        mechanism_categories["category_id"] = (
+            mechanism_categories[available_category_components]
+            .astype(str)
+            .agg("|".join, axis=1)
+        )
+
+    efficiency_cols = [
+        "source_scope",
+        "db_name",
+        "condition",
+        "current_na",
+        "trial_number",
+        "candidate_id",
+        "Ko_baseline_mM",
+        "Ko_peak_mM",
+        "Ko_final_mM",
+        "Ko_recovery_error_mM",
+        "Ko_rise_rate_mM_per_s",
+        "Ko_decay_rate_abs_mM_per_s",
+        "Ko_rise_over_decay_rate",
+        "Ko_efficiency_score",
+        "Ko_rise_speed_class",
+        "Ko_decay_speed_class",
+        "Ko_efficiency_quadrant",
+        "Ko_efficiency_status",
+        "Ko_rise_fast_slow_cutoff",
+        "Ko_decay_fast_slow_cutoff",
+        "Ko_efficiency_threshold_source",
+        "Ko_efficiency_threshold_interpretation",
+    ]
+    efficiency = fit_with_eff[[c for c in efficiency_cols if c in fit_with_eff.columns]].copy()
+
+    fv_cols = [
+        "P_gap_eff",
+        "gamma_s_eff",
+        "gki",
+        "zth",
+        "zs",
+        "sigmoid_state_at_stim_end_10_90",
+        "sigmoid_state_at_sim_end_10_90",
+        "temporal_recruitment_class",
+        "gap_fraction",
+        "kir_fraction",
+        "leak_fraction",
+    ]
+    fk_cols = [
+        "Ko_peak_mM",
+        "Ko_final_mM",
+        "Ko_recovery_error_mM",
+        "Ko_rise_rate_mM_per_s",
+        "Ko_decay_rate_abs_mM_per_s",
+        "Ko_efficiency_score",
+        "Ko_efficiency_quadrant",
+    ]
+    mapping_cols = [
+        "source_scope",
+        "db_name",
+        "condition",
+        "current_na",
+        "trial_number",
+        "candidate_id",
+    ] + [c for c in fv_cols + fk_cols if c in fit_with_eff.columns]
+    mechanistic_function_mapping = fit_with_eff[mapping_cols].copy()
+
+    summary = {
+        "step_name": "Step 05 legacy top-N mechanistic function mapping",
+        "n_legacy_configurations": int(len(library)),
+        "n_successful_legacy_simulations": int(fit_mechanisms["simulation_status"].eq("ok").sum()),
+        "n_legacy_windowed_rows": int(len(windowed)),
+        "n_legacy_category_rows": int(len(mechanism_categories)),
+        "legacy_top_n_per_db": int(config.legacy_top_n_per_db),
+        "legacy_max_configs": config.legacy_max_configs,
+    }
+    if config.write_outputs:
+        fit_with_eff.to_csv(out_dir / "legacy_fit_mechanisms.csv", index=False)
+        windowed.to_csv(out_dir / "legacy_fit_mechanisms_windowed.csv", index=False)
+        mechanism_categories.to_csv(out_dir / "legacy_mechanism_categories.csv", index=False)
+        mode_vectors.to_csv(out_dir / "legacy_mode_vector_by_configuration.csv", index=False)
+        efficiency.to_csv(out_dir / "legacy_function_efficiency_by_configuration.csv", index=False)
+        mechanistic_function_mapping.to_csv(out_dir / "legacy_mechanistic_function_mapping.csv", index=False)
+        thresholds.to_csv(out_dir / "legacy_efficiency_thresholds.csv", index=False)
+        (out_dir / "analysis_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+    return {
+        "legacy_fit_mechanisms": fit_with_eff,
+        "legacy_fit_mechanisms_windowed": windowed,
+        "legacy_mechanism_categories": mechanism_categories,
+        "legacy_mode_vector_by_configuration": mode_vectors,
+        "legacy_function_efficiency_by_configuration": efficiency,
+        "legacy_mechanistic_function_mapping": mechanistic_function_mapping,
+        "legacy_efficiency_thresholds": thresholds,
+        "analysis_summary": summary,
+    }
 
 
 def run_step05_mechanistic_decomposition(
@@ -901,6 +1270,25 @@ def run_step05_mechanistic_decomposition(
         if config.write_outputs
         else pd.DataFrame()
     )
+    legacy_output_dir = (
+        None
+        if output_dir is None
+        else out_dir.parent / LEGACY_OUTPUT_SUBDIR
+    )
+    legacy_mapping = (
+        run_legacy_mechanistic_mapping(root, config, output_dir=legacy_output_dir)
+        if config.run_legacy_mapping
+        else {
+            "legacy_fit_mechanisms": pd.DataFrame(),
+            "legacy_fit_mechanisms_windowed": pd.DataFrame(),
+            "legacy_mechanism_categories": pd.DataFrame(),
+            "legacy_mode_vector_by_configuration": pd.DataFrame(),
+            "legacy_function_efficiency_by_configuration": pd.DataFrame(),
+            "legacy_mechanistic_function_mapping": pd.DataFrame(),
+            "legacy_efficiency_thresholds": pd.DataFrame(),
+            "analysis_summary": {},
+        }
+    )
 
     summary = {
         "step_name": "Step 05 — Mechanistic decomposition of accepted cell ensembles",
@@ -932,6 +1320,10 @@ def run_step05_mechanistic_decomposition(
             else "no clusters"
         ),
         "headline_claim_scope": str(claim_scope.iloc[0]["allowed_pre_step06_claim"]),
+        "legacy_mapping_enabled": bool(config.run_legacy_mapping),
+        "n_legacy_category_rows": int(
+            len(legacy_mapping.get("legacy_mechanism_categories", pd.DataFrame()))
+        ),
         "elapsed_seconds": time.perf_counter() - t0,
     }
 
@@ -973,5 +1365,6 @@ def run_step05_mechanistic_decomposition(
         "bootstrap_cluster_stability": stability,
         "claim_scope_table": claim_scope,
         "performance_benchmark": perf,
+        **legacy_mapping,
         "analysis_summary": summary,
     }

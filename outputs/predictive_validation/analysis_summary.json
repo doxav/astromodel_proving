@@ -32,19 +32,23 @@
     "robustness_K_o_final_max_mM": 7.0,
     "min_perturbation_feature_pass_fraction": 0.25,
     "min_robust_fraction": 0.5,
+    "run_legacy_biological_perturbations": true,
+    "biological_max_configs_per_category": 2,
+    "biological_run_pair_sweeps": true,
     "write_outputs": true,
     "require_candidate_level_heldout": true,
     "final_degeneracy_claim_allowed": false
   },
-  "n_candidates": 35,
-  "n_heldout_rows": 280,
-  "n_prediction_interval_rows": 324,
-  "n_ppc_rows": 324,
-  "n_perturbation_rows": 1890,
+  "n_candidates": 29,
+  "n_heldout_rows": 232,
+  "n_prediction_interval_rows": 270,
+  "n_ppc_rows": 270,
+  "n_perturbation_rows": 1566,
+  "legacy_biological_perturbation_enabled": true,
+  "n_legacy_biological_perturbation_rows": 1708,
   "validation_labels": [
-    "prediction_limited",
     "predictive_supported"
   ],
   "headline_claim_scope": "Mechanism regimes require predictive_supported labels before any degeneracy language; Step 06 alone keeps claims conservative.",
-  "elapsed_seconds": 96.91087168199738
+  "elapsed_seconds": 209.8380574890034
 }

@@ -22,10 +22,10 @@
     "heldout_pass_min": 0.3,
     "write_outputs": true
   },
-  "n_candidates": 33,
-  "n_gating_rows": 198,
-  "n_proxy_rows": 33,
-  "n_compartment_rows": 33,
+  "n_candidates": 29,
+  "n_gating_rows": 174,
+  "n_proxy_rows": 29,
+  "n_compartment_rows": 29,
   "gating_families": [
     "sigmoid",
     "tanh",
@@ -35,5 +35,5 @@
     "double_sigmoid"
   ],
   "claim_scope": "Step 07 can mark assumptions robust or model-dependent, but final biological degeneracy claims remain disallowed until later plausibility/statistical checks pass.",
-  "elapsed_seconds": 18.571622179995757
+  "elapsed_seconds": 4.908821686010924
 }

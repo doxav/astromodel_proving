@@ -20,6 +20,13 @@ Supported fallback input for the newer multi-sweep runner:
 
 - `outputs/step04_cell_specific_multisweep/accepted_candidates.csv`.
 
+Source-scoped first-pass legacy input for the "to be generated" perturbation
+layer:
+
+- `outputs/postfit_sqlite/legacy_configuration_library.csv`, built from top
+  legacy Optuna trials. This input is provisional and must remain separated from
+  the Step 04 accepted cell-specific ensemble.
+
 The loader must preserve the biological and fitting contract fields from Step 04:
 
 - `file_id`
@@ -45,6 +52,19 @@ All reviewer-facing outputs are written under `outputs/mechanisms/`:
 | `claim_scope_table.csv` | Explicit language allowed for manuscript claims before Step 06. |
 | `analysis_summary.json` | Configuration, input source, row counts, and conservative headline status. |
 
+Source-scoped legacy outputs are written under `outputs/legacy_mechanisms/`:
+
+| Output | Required contents |
+|---|---|
+| `legacy_fit_mechanisms.csv` | One row per selected legacy configuration simulation, with hidden currents, K_o kinetics, sigmoid states, and provenance. |
+| `legacy_fit_mechanisms_windowed.csv` | Windowed ionic-state and recruitment summaries. |
+| `legacy_mechanism_categories.csv` | Baseline category labels for perturbation grouping. |
+| `legacy_mode_vector_by_configuration.csv` | FV-style mechanism/parameter/state vectors. |
+| `legacy_function_efficiency_by_configuration.csv` | FK-style K_o buffering-function metrics and EF score. |
+| `legacy_mechanistic_function_mapping.csv` | Merged FV-to-FK mapping used by Step 06. |
+| `legacy_efficiency_thresholds.csv` | Frozen descriptive baseline medians used for fast/slow K_o rise and decay labels. |
+| `analysis_summary.json` | Legacy selection rule, row counts, and source-scope status. |
+
 ## Scientific objectives
 
 1. Compute hidden-current and K_o summaries for every accepted cell candidate across the six ordered pump-current sweeps.
@@ -55,6 +75,8 @@ All reviewer-facing outputs are written under `outputs/mechanisms/`:
 6. Test whether representative cluster centers are connected by accepted effective-parameter interpolations.
 7. Select same-function but mechanism-diverse representatives for Step 06 perturbation and predictive validation.
 8. Report cluster occupancy separately by DH/VH region and condition.
+9. For the source-scoped legacy layer, compute baseline K_o efficiency and
+   sigmoid/recruitment categories for top legacy Optuna configurations.
 
 ## Technical design
 
@@ -109,6 +131,23 @@ Representative cluster centers are interpolated in log/effective coordinates. If
 
 Representatives are selected by maximin distance in standardized mechanism space after filtering to Step 04 accepted/reviewer-facing candidates. Representatives must preserve functional status and expose their `representative_rank`, `selection_reason`, and `claim_scope`.
 
+### Legacy function-efficiency mapping
+
+The legacy layer computes K_o features from hidden simulated `K_o`, not from Vm.
+It writes the continuous score
+`Ko_efficiency_score = Ko_rise_rate_mM_per_s / Ko_decay_rate_abs_mM_per_s`
+when the denominator is finite and positive, otherwise an explicit undefined
+status is stored. Four descriptive classes are used for grouping only:
+`fast_rise_fast_decay`, `slow_rise_fast_decay`, `slow_rise_slow_decay`, and
+`fast_rise_slow_decay`. Fast/slow cutoffs are frozen medians from the legacy
+baseline distribution, preferably within `source_scope x current_na` and with a
+global fallback for underpowered strata. These classes are not experimental
+high/low-efficiency thresholds.
+
+Legacy category rows must include sigmoid state at stimulation end, sigmoid
+state at simulation end, temporal recruitment class, gap-junction ionic state,
+activation/recruited-surface proxy fields, and `source_scope`.
+
 ## Gherkin specifications
 
 ```gherkin
@@ -119,6 +158,18 @@ Feature: accepted cell fits are translated into mechanism summaries
     When the mechanism pipeline simulates them
     Then each fit has I_Kir, I_kgap, I_leak, K_o, gap/Kir ratio, and proxy validity
     And failed simulations are reported without corrupting the ensemble
+```
+
+```gherkin
+@step05 @legacy @functional-efficiency
+Feature: legacy source configurations are mapped from mechanism vectors to K_o function
+  Scenario: top legacy Optuna configurations receive K_o EF and sigmoid labels
+    Given a source-scoped legacy configuration library from Step 01
+    When the legacy mechanism mapping is run
+    Then baseline K_o rise and decay features are written
+    And Ko_efficiency_score is saved as a continuous value when defined
+    And sigmoid state and temporal recruitment categories are written for Step 06 grouping
+    And the output remains labeled as legacy provisional evidence
 ```
 
 ```gherkin
@@ -161,6 +212,8 @@ Feature: mechanism regimes are summarized by brain region
   - Flux summaries contain hidden-current, K_o, and proxy-validity columns.
 - Acceptance tests:
   - Running Step 05 writes all required CSV/JSON outputs.
+  - Running the legacy mapping writes `outputs/legacy_mechanisms/*` with K_o EF
+    and sigmoid state columns.
   - Mechanism outputs never drop `region` or `condition`.
   - Representatives are Step 04 accepted/reviewer-facing candidates.
   - Claim-scope statuses remain conservative before Step 06.

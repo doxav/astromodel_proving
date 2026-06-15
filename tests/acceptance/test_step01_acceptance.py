@@ -25,6 +25,37 @@ def test_step01_top_trials_export_covers_all_dbs(project_root: Path, tmp_path: P
         assert np.isfinite(top_trials[column]).all()
 
 
+def test_step01_writes_legacy_top_n_library_and_factor_table(project_root: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "postfit_sqlite"
+    results = run_step01_postfit_sqlite(
+        project_root,
+        top_n=2,
+        legacy_top_n=4,
+        output_dir=output_dir,
+    )
+    legacy = results["legacy_configuration_library"]
+    factors = results["legacy_condition_parameter_ratios"]
+
+    assert len(legacy) == 18 * 4
+    assert {
+        "source_scope",
+        "legacy_configuration_status",
+        "legacy_acceptance_rule",
+        "legacy_selection_rule",
+        "legacy_top_n_requested",
+        "rank_in_db",
+        "P_gap_eff",
+        "gamma_s_eff",
+    }.issubset(legacy.columns)
+    assert "accepted" not in legacy.columns
+    assert legacy["legacy_acceptance_rule"].eq("not_thresholded_top_n_first_pass").all()
+    assert {"filter_baseline_fold_grid", "legacy_top_trial_ratio"}.issubset(
+        set(factors["factor_source"])
+    )
+    assert (output_dir / "legacy_configuration_library.csv").exists()
+    assert (output_dir / "legacy_condition_parameter_ratios.csv").exists()
+
+
 def test_step01_effective_parameter_summary_is_complete(project_root: Path, tmp_path: Path) -> None:
     results = run_step01_postfit_sqlite(project_root, top_n=2, output_dir=tmp_path / "postfit_sqlite")
     summary = results["effective_parameter_summary"]

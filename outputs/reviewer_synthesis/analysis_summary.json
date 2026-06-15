@@ -5,9 +5,11 @@
   },
   "n_reviewer_rows": 7,
   "n_claim_rows": 6,
-  "n_manifest_rows": 35,
+  "n_manifest_rows": 46,
+  "n_reviewer_link_rows": 16,
+  "n_pathway_gate_rows": 32,
   "missing_manifest_artifacts": [],
   "final_biological_degeneracy_claim_allowed": false,
   "headline_claim_scope": "Final degeneracy wording is allowed only if all upstream evidence layers are supported.",
-  "elapsed_seconds": 0.020797915996809024
+  "elapsed_seconds": 0.14203678800549824
 }

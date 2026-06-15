@@ -1,9 +1,11 @@
 mechanism_cluster,region,condition,validation_label,restricted_all_gate_pass,blocking_axes,allowed_claim,forbidden_claim
-M1,DH,CONTROL,predictive_supported,False,not_joined,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
-M1,DH,MFA,prediction_limited,False,prediction_perturbation;assumptions;parameter_step08;parameter_semantics;K_o_homeostasis,prediction-limited mechanism candidate,broad biological degeneracy or pathway-level phenotype
-M1,VH,MFA,prediction_limited,False,prediction_perturbation;assumptions;parameter_step08;parameter_semantics;K_o_homeostasis,prediction-limited mechanism candidate,broad biological degeneracy or pathway-level phenotype
-M2,DH,MFA,prediction_limited,False,prediction_perturbation;assumptions;parameter_step08;parameter_semantics;K_o_homeostasis,prediction-limited mechanism candidate,broad biological degeneracy or pathway-level phenotype
-M2,VH,CONTROL,prediction_limited,False,not_joined,prediction-limited mechanism candidate,broad biological degeneracy or pathway-level phenotype
-M2,VH,MFA,prediction_limited,False,prediction_perturbation;assumptions;parameter_step08;parameter_semantics;K_o_homeostasis,prediction-limited mechanism candidate,broad biological degeneracy or pathway-level phenotype
-M3,DH,MFA_BA,predictive_supported,False,not_joined,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
-M3,VH,MFA_BA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics;assumptions;parameter_step08;parameter_semantics;K_o_homeostasis,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M2,DH,CONTROL,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M2,DH,MFA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M2,DH,MFA_BA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M2,VH,MFA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M2,VH,MFA_BA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M3,DH,CONTROL,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M3,DH,MFA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M3,DH,MFA_BA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M3,VH,MFA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype
+M3,VH,MFA_BA,predictive_supported,False,assumptions;parameter_step08;parameter_semantics,predictive model-derived mechanism scenario,broad biological degeneracy or pathway-level phenotype

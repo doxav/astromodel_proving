@@ -1,0 +1,9 @@
+{
+  "step_name": "Step 05 legacy top-N mechanistic function mapping",
+  "n_legacy_configurations": 5400,
+  "n_successful_legacy_simulations": 5400,
+  "n_legacy_windowed_rows": 21600,
+  "n_legacy_category_rows": 5400,
+  "legacy_top_n_per_db": 300,
+  "legacy_max_configs": null
+}

@@ -1,0 +1,2 @@
+gate,gate_status,n_selected_baselines,n_one_dimensional_rows,n_pair_sweep_rows,direction_match_fraction,allowed_claim,forbidden_claim,remaining_requirement
+legacy_perturbation_claim,first_pass_screen_complete,73,1708,2745,0.15024882903981265,legacy_category_perturbation_screen,biologically_proven_degeneracy_or_anatomical_syncytium_count,"full validation requires expanded baselines, external perturbation magnitudes if used, assumption gates, and parameter interpretation gates"

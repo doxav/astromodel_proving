@@ -7,10 +7,21 @@ Step 04,outputs/cell_fits/cell_fit_candidates.csv,Full candidate history for aud
 Step 05,outputs/mechanisms/accepted_fit_mechanisms.csv,Hidden-current flux decomposition,True,reviewer_facing_source_table
 Step 05,outputs/mechanisms/accepted_fit_mechanisms_windowed.csv,Windowed local/spatial mechanism characterization,True,reviewer_facing_source_table
 Step 05,outputs/mechanisms/buffering_phenotype_tags.csv,Provisional phenotype tags,True,reviewer_facing_source_table
+Step 05 legacy,outputs/legacy_mechanisms/legacy_mechanism_categories.csv,Legacy sigmoid/temporal mechanism categories,True,reviewer_facing_source_table
+Step 05 legacy,outputs/legacy_mechanisms/legacy_function_efficiency_by_configuration.csv,Legacy K_o EF score and descriptive quadrant table,True,reviewer_facing_source_table
+Step 05 legacy,outputs/legacy_mechanisms/legacy_mechanistic_function_mapping.csv,Legacy FV-to-FK mechanistic function mapping,True,reviewer_facing_source_table
 Step 06,outputs/predictive_validation/robustness_summary.csv,Prediction and perturbation robustness,True,reviewer_facing_source_table
+Step 06 legacy,outputs/legacy_perturbation/biological_parameter_direction_summary.csv,Legacy MFA/MFA+BA-like direction summaries,True,reviewer_facing_source_table
+Step 06 legacy,outputs/legacy_perturbation/experimental_direction_match_summary.csv,Legacy perturbation direction match summary,True,reviewer_facing_source_table
+Step 06 legacy,outputs/legacy_perturbation/sigmoid_state_change_summary.csv,Sigmoid state changes under biological perturbation sweeps,True,reviewer_facing_source_table
+Step 06 legacy,outputs/legacy_perturbation/phase_portrait_points.csv,2D phase-space points for perturbation visualization,True,reviewer_facing_source_table
 Step 07,outputs/assumption_sensitivity/claim_scope_table.csv,Assumption-sensitivity claim scope,True,reviewer_facing_source_table
 Step 08,outputs/parameter_plausibility/interpretability_status.csv,Parameter interpretability guardrails,True,reviewer_facing_source_table
 Step 09,outputs/reviewer_synthesis/reviewer_traceability_table.csv,R1-R7 response map,True,reviewer_facing_source_table
+Step 09,outputs/reviewer_synthesis/reviewer_remark_artifact_links.csv,R1-R7 ordered links to useful result artifacts and notebook cells,True,reviewer_facing_source_table
+Step 09,outputs/reviewer_synthesis/mechanistic_pathway_perturbation_gate.csv,Mechanistic pathway perturbation gate,True,reviewer_facing_source_table
+Step 09,outputs/reviewer_synthesis/legacy_perturbation_claim_gate.csv,Legacy perturbation claim gate,True,reviewer_facing_source_table
+Step 09,outputs/reviewer_synthesis/degeneracy_scientific_value_statement.csv,Objective scientific value statement when biological degeneracy is not proven,True,reviewer_facing_source_table
 Selected action 1,outputs/predictive_validation/phenotype_robustness_summary.csv,Phenotype robustness by mechanism/stratum,True,reviewer_facing_source_table
 Selected action 1,outputs/reviewer_synthesis/stratum_support_gate.csv,Region-condition support gates,True,reviewer_facing_source_table
 Selected action 1,outputs/predictive_validation/prediction_limited_failure_modes.csv,Prediction-limited failure decomposition,True,reviewer_facing_source_table

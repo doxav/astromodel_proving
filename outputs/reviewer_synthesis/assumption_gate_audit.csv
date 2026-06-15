@@ -1,4 +1,4 @@
 assumption_axis,n_rows,metric,metric_value,threshold,gate_pass,gate_status,claim_scope
-gating_form,180,unstable_fraction,0.01666666666666672,0.25,True,pass,same-parameter gating-family screen; refit-level test still pending
-intracellular_K_as_ECS_proxy,30,proxy_limited_fraction,0.5666666666666667,0.25,False,fail,proxy exclusion can restrict claims; explicit ECS variant still needed for broad ECS-homeostasis claims
-local_syncytial_compartment_split,30,split_sensitive_fraction,0.0,0.25,True,pass,lumped split appears stable in current screen if gate passes; spatial-scale validation remains separate
+gating_form,174,unstable_fraction,0.0,0.25,True,pass,same-parameter gating-family screen; refit-level test still pending
+intracellular_K_as_ECS_proxy,29,proxy_limited_fraction,0.8620689655172413,0.25,False,fail,proxy exclusion can restrict claims; explicit ECS variant still needed for broad ECS-homeostasis claims
+local_syncytial_compartment_split,29,split_sensitive_fraction,0.10344827586206895,0.25,True,pass,lumped split appears stable in current screen if gate passes; spatial-scale validation remains separate

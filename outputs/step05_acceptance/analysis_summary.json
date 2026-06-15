@@ -16,6 +16,10 @@
     "min_cells_for_multicluster": 3,
     "min_cells_per_cluster": 2,
     "proxy_failure_downgrade_fraction": 0.5,
+    "run_legacy_mapping": false,
+    "legacy_top_n_per_db": 300,
+    "legacy_max_configs": null,
+    "legacy_min_rows_per_efficiency_stratum": 10,
     "write_outputs": true
   },
   "n_input_candidates": 2,
@@ -28,5 +32,7 @@
   "cluster_evidence_status": "insufficient_evidence",
   "cluster_evidence_reason": "needs >= 6 candidates and >= 3 independent cells; observed 2 candidates and 1 cells",
   "headline_claim_scope": "insufficient_evidence_for_candidate_mechanism_regimes",
-  "elapsed_seconds": 1.5371072470006766
+  "legacy_mapping_enabled": false,
+  "n_legacy_category_rows": 0,
+  "elapsed_seconds": 0.9957392169890227
 }

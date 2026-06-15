@@ -1,5 +1,5 @@
 candidate_policy,candidates_per_cell,analysis_role,headline_use,selection_basis,n_candidates,n_cells,n_robustness_rows,n_predictive_supported_rows,n_prediction_limited_rows,predictive_supported_fraction,mean_biological_description_score,mean_perturbation_robust_fraction
-best_per_cell,1,canonical conservative default,True,one highest-quality accepted candidate per represented cell,35,35,8,3,5,0.375,0.6167659823703144,0.4129464285714286
-top_k_per_cell,3,expanded-scope sensitivity,True,top accepted candidates per cell by heldout/fit quality,99,35,13,8,5,0.6153846153846154,0.6480921073056215,0.5227653133903134
-mechanism_diverse_per_cell,3,recommended expanded-scope sensitivity,True,"one accepted candidate per Step 05 mechanism cluster per cell, up to k",84,35,15,10,5,0.6666666666666666,0.6646468303317952,0.5568452380952381
-mechanism_score_diverse_per_cell,3,diagnostic negative-control sensitivity,False,quality-seeded maximin selection over log effective coordinates plus Step 05 continuous mechanism scores,99,35,14,7,7,0.5,0.6437095478796199,0.5044728750085894
+best_per_cell,1,canonical conservative default,True,one highest-quality accepted candidate per represented cell,29,29,10,10,0,1.0,0.8830986737930768,0.9991666666666668
+top_k_per_cell,3,expanded-scope sensitivity,True,top accepted candidates per cell by heldout/fit quality,78,29,12,12,0,1.0,0.8797987713750155,0.9983878968253967
+mechanism_diverse_per_cell,3,recommended expanded-scope sensitivity,True,"one accepted candidate per Step 05 mechanism cluster per cell, up to k",57,29,12,12,0,1.0,0.8743697572322979,0.989814814814815
+mechanism_score_diverse_per_cell,3,diagnostic negative-control sensitivity,False,quality-seeded maximin selection over log effective coordinates plus Step 05 continuous mechanism scores,78,29,11,11,0,1.0,0.8767583130117326,0.9932498057498056

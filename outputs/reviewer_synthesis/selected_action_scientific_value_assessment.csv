@@ -1,23 +1,23 @@
 artifact_key,n_rows,n_columns,scientific_value_status,rationale
 selected_action_strategy_comparison,3,8,retain,artifact has rows and explicit gates
-phenotype_robustness_summary,17,13,retain,artifact has rows and explicit gates
+phenotype_robustness_summary,18,13,retain,artifact has rows and explicit gates
 stratum_support_gate,6,14,retain,artifact has rows and explicit gates
-prediction_limited_failure_modes,5,15,retain,artifact has rows and explicit gates
+prediction_limited_failure_modes,0,0,remove_or_regenerate,artifact is empty and cannot support reviewer response
 assumption_gate_audit,3,8,retain_as_blocker_evidence,assumption gate failures are scientifically important limitations
-proxy_exclusion_claim_sensitivity,8,11,retain,artifact has rows and explicit gates
+proxy_exclusion_claim_sensitivity,10,11,retain,artifact has rows and explicit gates
 parameter_semantics_audit,9,11,retain,artifact has rows and explicit gates
-full_accepted_parameter_audit,18990,27,retain,artifact has rows and explicit gates
-parameter_interpretation_class_audit,270,34,retain,artifact has rows and explicit gates
-constrained_failure_modes,30,13,retain,artifact has rows and explicit gates
-K_o_homeostasis_endpoint_audit,17,13,retain,artifact has rows and explicit gates
-intercluster_interpolation_acceptance,390,18,retain,artifact has rows and explicit gates
-phenotype_threshold_sensitivity,2110,12,retain,artifact has rows and explicit gates
-all_current_assumption_sensitivity,108,7,retain,artifact has rows and explicit gates
-cell_specific_identifiability_audit,315,11,retain,artifact has rows and explicit gates
+full_accepted_parameter_audit,3177,27,retain,artifact has rows and explicit gates
+parameter_interpretation_class_audit,261,34,retain,artifact has rows and explicit gates
+constrained_failure_modes,29,13,retain,artifact has rows and explicit gates
+K_o_homeostasis_endpoint_audit,18,13,retain,artifact has rows and explicit gates
+intercluster_interpolation_acceptance,270,18,retain,artifact has rows and explicit gates
+phenotype_threshold_sensitivity,353,12,retain,artifact has rows and explicit gates
+all_current_assumption_sensitivity,90,7,retain,artifact has rows and explicit gates
+cell_specific_identifiability_audit,261,11,retain,artifact has rows and explicit gates
 parameter_ranges_citation_audit,9,14,retain,artifact has rows and explicit gates
 notebook_update_screen_after_selected_actions,10,6,retain,artifact has rows and explicit gates
-integrated_degeneracy_gate_matrix,30,25,retain,artifact has rows and explicit gates
-degeneracy_level_table,30,11,retain,artifact has rows and explicit gates
-restricted_validation_claims,8,8,retain,artifact has rows and explicit gates
-restricted_all_gate_join,30,15,retain_as_blocker_evidence,all-gate join objectively shows final degeneracy remains blocked
+integrated_degeneracy_gate_matrix,29,25,retain,artifact has rows and explicit gates
+degeneracy_level_table,29,11,retain,artifact has rows and explicit gates
+restricted_validation_claims,10,8,retain,artifact has rows and explicit gates
+restricted_all_gate_join,29,15,retain_as_blocker_evidence,all-gate join objectively shows final degeneracy remains blocked
 claim_to_artifact_ledger,6,6,retain,artifact has rows and explicit gates

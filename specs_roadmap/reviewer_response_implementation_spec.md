@@ -49,6 +49,7 @@ This table is part of the specification. It records whether the development plan
 | Population-level posterior predictive checks. | Covered by Step 06 and Step 09. | Add explicit feature-distribution posterior predictive checks for `region × condition × sweep` groups using accepted ensembles. |
 | Figures and reviewer-facing outputs. | Covered by Step 09. | Add a traceability table mapping each figure/table to reviewer critique IDs and source outputs. |
 | Integrated reviewer-response synthesis. | Covered by Step 09. | Generate R1-R7 traceability, claim-maturity, and manuscript asset tables from actual Step 00-08 outputs without upgrading unsupported biological degeneracy claims. |
+| First-pass legacy mechanism/function perturbation layer. | Covered as source-scoped auxiliary output in Steps 01, 05, 06, and 09. | Use top legacy Optuna trials and Filtered-baseline fold grids only. Keep it separate from Step 04 accepted cell-specific ensembles and label all claims provisional. |
 
 ## Region-aware experimental-design contract
 
@@ -107,6 +108,9 @@ This step is a partial response because it does not yet improve the model. It pr
   - `verified`: recomputed objective matches DB objective within tolerance;
   - `unresolved`: objective cannot be matched yet;
   - `missing_source`: expected trace or DB is absent.
+- Prepare Step 01 to build a source-scoped top-300 legacy Optuna library for
+  provisional mechanism/function mapping. This library is not a reviewer-facing
+  accepted ensemble.
 
 ### Approaches to compare
 
@@ -186,6 +190,10 @@ The notebook must show:
 **Pareto rank:** 1. Converts old single-current DBs from black-box fits into reviewer-useful post-fit evidence.
 
 **Primary output:** `outputs/postfit_sqlite/top_trials_all_dbs.csv`, `outputs/postfit_sqlite/representative_mechanism_summary.csv`, `outputs/postfit_sqlite/effective_parameter_summary.csv`.
+Additional source-scoped legacy outputs for the first-pass perturbation layer:
+`outputs/postfit_sqlite/legacy_configuration_library.csv`,
+`outputs/postfit_sqlite/legacy_configuration_status_by_db.csv`, and
+`outputs/postfit_sqlite/legacy_condition_parameter_ratios.csv`.
 
 ### Scientific objectives
 
@@ -205,6 +213,12 @@ This remains partial because best-trial or top-N single-current analysis is not 
 - Compute `P_gap_eff`, `gamma_t_eff`, `gamma_s_eff`, `volume_ratio_wa_wo`.
 - Compute flux/proxy metrics with `src.mechanisms`.
 - Produce per-condition summary tables.
+- Build a top legacy Optuna trial library with
+  `legacy_selection_rule = "top_n_by_objective"`,
+  `legacy_top_n_requested = 300`, and
+  `legacy_acceptance_rule = "not_thresholded_top_n_first_pass"`.
+- Write exploratory perturbation-factor candidates from the Filtered baseline
+  fold grid and legacy ratios, not from Naris magnitudes.
 
 ### Approaches to compare
 
@@ -304,6 +318,10 @@ This step is stronger than the legacy `threshold_for_good_enough_fits(TO BE RECO
 - Estimate region effects and `region × condition` interactions for key features using cell-level bootstrap or mixed/clustered models.
 - Identify redundant features, especially `peak_depolarization_mV` versus `stim_end_depolarization_mV`.
 - Export a threshold file that can be consumed by the post-fit and multi-current fitting steps.
+- Export experimental direction-of-change target tables for CONTROL-to-MFA,
+  MFA-to-MFA+BA, and CONTROL-to-MFA+BA, including DH/VH delta-of-delta summaries
+  and the second-layer regional perturbation tables from the updated ATF
+  analysis notebook.
 
 ### Approaches to compare
 
@@ -624,6 +642,10 @@ The notebook must show:
 **Pareto rank:** 5. Converts cell-specific accepted ensembles into mechanism-level evidence. This is the primary step for R5 and the first step where candidate mechanism regimes may be assessed. These regimes remain candidate regimes until Step 06 predictive and perturbation checks support them.
 
 **Primary output:** `outputs/mechanisms/accepted_fit_mechanisms.csv`, `outputs/mechanisms/mechanism_clusters.csv`, `outputs/mechanisms/representatives.csv`, `outputs/mechanisms/region_mechanism_enrichment.csv`, `outputs/mechanisms/geometry_classification.csv`, `outputs/mechanisms/bootstrap_cluster_stability.csv`, `outputs/mechanisms/claim_scope_table.csv`, and `outputs/mechanisms/analysis_summary.json`.
+Auxiliary source-scoped legacy outputs are written under
+`outputs/legacy_mechanisms/` and include baseline K_o EF scores, descriptive
+fast/slow rise/decay classes, sigmoid state labels, temporal recruitment labels,
+and FV-to-FK mapping tables for the perturbation layer.
 
 ### Scientific objectives
 
@@ -652,6 +674,10 @@ The notebook must show:
 - Select representative fits that preserve function while maximizing mechanism diversity.
 - Report cluster occupancy and enrichment by `region × condition`, with cell-level counts and small-stratum flags.
 - Keep all failed simulations and proxy failures as explicit statuses.
+- For the source-scoped legacy layer, compute K_o EF from hidden `K_o` as
+  `Ko_rise_rate_mM_per_s / Ko_decay_rate_abs_mM_per_s`, save continuous scores,
+  classify descriptive EF quadrants with frozen legacy baseline medians, and
+  export sigmoid state at stimulation end and simulation end.
 
 ### Approaches to compare
 
@@ -741,6 +767,11 @@ The notebook must show:
 **Pareto rank:** 6. Tests whether accepted ensembles predict beyond fitted traces and remain functionally robust under perturbations.
 
 **Primary output:** `outputs/predictive_validation/heldout_current_errors.csv`, `outputs/predictive_validation/prediction_intervals.csv`, `outputs/predictive_validation/feature_distribution_ppc.csv`, `outputs/predictive_validation/perturbation_sweeps.csv`, `outputs/predictive_validation/robustness_summary.csv`.
+Auxiliary source-scoped legacy perturbation outputs are written under
+`outputs/legacy_perturbation/`, including one-dimensional and two-dimensional
+MFA-like/MFA+BA-like parameter sweeps, sigmoid-state-change summaries,
+experimental direction-match summaries, and static phase-portrait source
+tables.
 
 ### Scientific objectives
 
@@ -761,6 +792,16 @@ The notebook must show:
   - baseline `K_o`;
   - current amplitude scaling;
   - plausible physiologic nuisance terms if implemented.
+- Run the source-scoped biological perturbation layer when enabled:
+  - perturb `P_gap_eff`, `gamma_s_eff`, `zth`, and `zs` for MFA-like contexts;
+  - perturb `gki` for MFA+BA-like contexts;
+  - use Filtered-baseline fold grids, not Naris-derived magnitudes;
+  - report Vm direction, K_o/EF direction, and sigmoid-state changes by legacy
+    category;
+  - compare simulated directions against Step 02 experimental targets;
+  - treat DH/VH regional matching as a conservative alignment screen against
+    experimental delta-of-delta targets, not as a region-assigned legacy model
+    prediction.
 - Summarize robustness by mechanism cluster, region, condition, and sweep.
 - Label mechanisms as `predictive_supported`, `prediction_limited`, or `fit_only`.
 
@@ -974,7 +1015,14 @@ Feature: constrained inference tests whether claims depend on implausible parame
 
 **Pareto rank:** 9. Turns the computational pipeline into manuscript and response-letter material.
 
-**Primary output:** `outputs/reviewer_figures/figure_manifest.csv`, `outputs/reviewer_figures/reviewer_traceability_table.csv`, `outputs/reviewer_figures/main_figure_sources.csv`, `outputs/reviewer_figures/supplement_figure_sources.csv`.
+**Primary output:** `outputs/reviewer_synthesis/reviewer_traceability_table.csv`,
+`outputs/reviewer_synthesis/claim_maturity_table.csv`,
+`outputs/reviewer_synthesis/reviewer_remark_artifact_links.csv`,
+`outputs/reviewer_synthesis/manuscript_asset_manifest.csv`,
+`outputs/reviewer_synthesis/mechanistic_pathway_perturbation_gate.csv`,
+`outputs/reviewer_synthesis/legacy_perturbation_claim_gate.csv`,
+`outputs/reviewer_synthesis/degeneracy_scientific_value_statement.csv`, and
+`outputs/reviewer_synthesis/analysis_summary.json`.
 
 ### Scientific objectives
 
@@ -985,6 +1033,8 @@ Feature: constrained inference tests whether claims depend on implausible parame
 ### Technical objectives
 
 - Build a traceability table mapping every output figure/table to reviewer critique IDs.
+- Build ordered R1-R7 artifact links with source notebooks and stable cell
+  references for the most useful generated results.
 - Export manuscript-ready figures from Steps 00–08.
 - Use consistent units and labels.
 - Prefer composite panels and uncertainty bands over many individual traces.
@@ -996,6 +1046,10 @@ Feature: constrained inference tests whether claims depend on implausible parame
   - source output file;
   - claim strength;
   - unresolved limitation.
+- Generate restricted gates for mechanistic pathway perturbation claims and
+  legacy perturbation claims. These gates can mark source-scoped mechanistic
+  hypotheses as useful, but must not upgrade biological degeneracy unless the
+  full Step 04-08 evidence chain supports it.
 
 ### Required figure families
 
@@ -1034,7 +1088,7 @@ Feature: manuscript-ready figures have consistent units and layouts
 
 ### Notebook required
 
-`analysis/09_reviewer_figures_and_traceability.ipynb`
+`analysis/09_reviewer_response_synthesis.ipynb`
 
 ---
 

@@ -5,6 +5,9 @@
 Step 02 turns the 37 ATF current-clamp files into the **experimental uncertainty model** used by the later fitting and accepted-ensemble steps. The old `threshold_for_good_enough_fits.csv` is useful as a historical artifact, but it is not reviewer-facing because it does not encode pharmacological condition and does not protect against DH/VH pooling.
 
 This step therefore replaces the old threshold logic with a **region-aware, condition-aware, sweep-aware feature pipeline**.
+It also exports experimental direction-of-change targets under CONTROL, MFA,
+and MFA+BA so Step 06 can compare simulated perturbation directions against the
+observed membrane-kinetic trends.
 
 ## Why this step matters
 
@@ -29,6 +32,9 @@ Relative to the earlier plan, the updated implementation spec tightens Step 02 i
 2. **Primary thresholds must be `region × condition × sweep × feature`.** Region-pooled or global-pooled tables are sensitivity/fallback outputs only.
 3. **Small strata must be explicit.** The `VH-control` stratum has 4 cells and must be flagged rather than silently treated as precise.
 4. **Performance must be measured, not guessed.** The implementation must compare the practical value of optional acceleration and decide whether it should remain optional.
+5. **Perturbation targets must be reusable source outputs.** The updated ATF
+   regional/condition perturbation analyses are ported into source code and CSV
+   outputs rather than remaining notebook-only calculations.
 
 ## Scientific objectives
 
@@ -206,6 +212,44 @@ Feature: step-02 acceleration is benchmark-driven
     When the benchmark compares numpy and warmed numba feature extraction
     Then the benchmark writes elapsed times and a tuning decision
     And the default engine remains numpy unless the configured speedup and end-to-end gain thresholds are met
+```
+
+### Objective S02.6 — Export experimental perturbation direction targets
+
+Build target tables from the canonical ATF feature table for later comparison
+against simulated MFA-like and MFA+BA-like perturbations:
+
+- `outputs/features/experimental_kinetic_direction_targets.csv`
+- `outputs/features/region_specific_perturbation_direction_targets.csv`
+- `outputs/features/experimental_condition_contrast_summary.csv`
+- `outputs/features/experimental_region_condition_profile_terms.csv`
+- `outputs/features/experimental_second_layer/matched_sweep_delta_of_delta.csv`
+- `outputs/features/experimental_second_layer/numeric_sweep_combo_slopes.csv`
+- `outputs/features/experimental_second_layer/numeric_sweep_condition_slope_deltas_within_region.csv`
+- `outputs/features/experimental_second_layer/numeric_sweep_delta_of_delta_between_regions.csv`
+- `outputs/features/experimental_second_layer/region_blind_condition_slopes.csv`
+- `outputs/features/experimental_second_layer/region_blind_condition_slope_deltas.csv`
+- `outputs/features/experimental_second_layer/delta_feature_profiles_by_region.csv`
+- `outputs/features/experimental_second_layer/delta_feature_profiles_region_blind.csv`
+- `outputs/features/experimental_second_layer/region_perturbation_summary_selected_features.csv`
+
+Required contrasts are `CONTROL_to_MFA`, `MFA_to_MFA_BA`, and
+`CONTROL_to_MFA_BA`. Direction labels are `increase`, `decrease`,
+`no_clear_change`, or `undefined`. Follow-up FDR adjustment must preserve NaN
+p-values rather than converting them into false significant or nonsignificant
+entries.
+
+#### Gherkin
+
+```gherkin
+@step02 @R2 @perturbation-targets
+Feature: experimental perturbation directions are exported for Step 06
+  Scenario: ATF condition contrasts produce reusable direction targets
+    Given the canonical feature table
+    When experimental perturbation targets are computed
+    Then CONTROL_to_MFA, MFA_to_MFA_BA, and CONTROL_to_MFA_BA rows are written
+    And DH-minus-VH delta-of-delta targets are written where the data support them
+    And each target row has a signed direction label and sample-size support columns
 ```
 
 ## Technical objectives

@@ -13,7 +13,11 @@ def test_step05_writes_required_outputs_and_conservative_claims(project_root):
     result = run_step05_mechanistic_decomposition(
         project_root,
         Step05Config(
-            max_candidates=2, time_points=60, bootstrap_iterations=2, write_outputs=True
+            max_candidates=2,
+            time_points=60,
+            bootstrap_iterations=2,
+            run_legacy_mapping=False,
+            write_outputs=True,
         ),
         output_dir=out_dir,
     )
@@ -61,6 +65,7 @@ def test_step05_small_ensemble_is_downgraded_not_reported_as_candidate_regime(
             max_candidates=2,
             time_points=60,
             bootstrap_iterations=2,
+            run_legacy_mapping=False,
             write_outputs=False,
         ),
     )
@@ -91,6 +96,7 @@ def test_step05_representatives_preserve_step04_acceptance(project_root):
             max_candidates=3,
             time_points=60,
             bootstrap_iterations=0,
+            run_legacy_mapping=False,
             write_outputs=False,
         ),
     )
@@ -98,3 +104,36 @@ def test_step05_representatives_preserve_step04_acceptance(project_root):
     assert not reps.empty
     assert reps["accepted"].astype(bool).all()
     assert not reps["claim_scope"].str.contains("candidate_degenerate_regimes").any()
+
+
+def test_step05_writes_legacy_ko_efficiency_and_sigmoid_categories(project_root, tmp_path):
+    result = run_step05_mechanistic_decomposition(
+        project_root,
+        Step05Config(
+            max_candidates=1,
+            time_points=40,
+            bootstrap_iterations=0,
+            run_legacy_mapping=True,
+            legacy_top_n_per_db=2,
+            legacy_max_configs=4,
+            write_outputs=True,
+        ),
+        output_dir=tmp_path / "mechanisms",
+    )
+    legacy = result["legacy_mechanism_categories"]
+    efficiency = result["legacy_function_efficiency_by_configuration"]
+
+    assert not legacy.empty
+    assert {
+        "sigmoid_state_at_stim_end_10_90",
+        "sigmoid_state_at_sim_end_10_90",
+        "temporal_recruitment_class",
+        "category_id",
+    }.issubset(legacy.columns)
+    assert not efficiency.empty
+    assert {
+        "Ko_efficiency_score",
+        "Ko_efficiency_quadrant",
+        "Ko_efficiency_threshold_interpretation",
+    }.issubset(efficiency.columns)
+    assert (tmp_path / "legacy_mechanisms" / "legacy_mechanism_categories.csv").exists()

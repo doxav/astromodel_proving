@@ -5,6 +5,7 @@ import json
 import pytest
 
 from src.step06_predictive_validation import Step06Config, load_step06_inputs, run_step06_predictive_validation
+from src.step05_mechanistic_decomposition import Step05Config, run_step05_mechanistic_decomposition
 
 
 def test_step06_writes_required_outputs_and_conservative_labels(project_root):
@@ -192,3 +193,54 @@ def test_step06_partial_step04_heldout_is_explicit_not_silent(project_root, tmp_
     assert heldout["prediction_status"].isin(
         {"predictive_pass", "prediction_limited", "fit_only"}
     ).all()
+
+
+def test_step06_writes_legacy_biological_perturbation_outputs(project_root, tmp_path):
+    run_step05_mechanistic_decomposition(
+        project_root,
+        Step05Config(
+            max_candidates=1,
+            time_points=30,
+            bootstrap_iterations=0,
+            run_legacy_mapping=True,
+            legacy_top_n_per_db=1,
+            legacy_max_configs=2,
+            write_outputs=True,
+        ),
+        output_dir=tmp_path / "mechanisms",
+    )
+    result = run_step06_predictive_validation(
+        project_root,
+        Step06Config(
+            max_candidates=1,
+            time_points=30,
+            run_legacy_biological_perturbations=True,
+            biological_max_configs_per_category=1,
+            biological_run_pair_sweeps=False,
+            write_outputs=True,
+        ),
+        output_dir=tmp_path / "predictive_validation",
+    )
+    sweeps = result["biological_parameter_perturbation_sweeps"]
+    sigmoid = result["sigmoid_state_change_summary"]
+    direction = result["experimental_direction_match_summary"]
+
+    assert not sweeps.empty
+    assert {
+        "perturbation_context",
+        "perturbed_parameter",
+        "sigmoid_state_change",
+        "direction_Ko_efficiency_score",
+    }.issubset(sweeps.columns)
+    assert not sigmoid.empty
+    assert not direction.empty
+    assert {
+        "regional_experimental_direction",
+        "regional_target_scope",
+        "regional_match_status",
+        "regional_match_interpretation",
+    }.issubset(direction.columns)
+    assert not direction["regional_match_status"].eq("not_evaluated_in_first_pass").any()
+    assert (
+        tmp_path / "legacy_perturbation" / "biological_parameter_perturbation_sweeps.csv"
+    ).exists()

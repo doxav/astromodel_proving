@@ -1,0 +1,20 @@
+{
+  "step_name": "Legacy biological MFA/MFA+BA perturbation layer",
+  "config": {
+    "time_points": 50,
+    "t_final_ms": 50000.0,
+    "max_configs_per_category": 2,
+    "pair_grid_factors": [
+      0.75,
+      1.0,
+      1.25
+    ],
+    "run_pair_sweeps": true,
+    "write_outputs": true
+  },
+  "n_baseline_categories": 42,
+  "n_selected_baselines": 73,
+  "n_one_dimensional_rows": 1708,
+  "n_pair_sweep_rows": 2745,
+  "selection_policy": "top_ranked_per_sigmoid_temporal_category"
+}
